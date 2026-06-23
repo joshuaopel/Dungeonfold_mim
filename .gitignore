@@ -1,0 +1,14 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+# build scratch
+*_ns.js
+*.tmp
+node_modules/
+# Electron build output (keep source, ignore packaged binaries)
+dist/
+out/
+*.exe
