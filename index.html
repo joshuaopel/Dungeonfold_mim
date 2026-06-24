@@ -2655,11 +2655,7 @@ function renderPlay(t){
       break;
     }
   }
-  ctx.save();
-  ctx.filter='drop-shadow(0 0 4px rgba(185,160,255,0.80)) drop-shadow(0 0 10px rgba(140,100,255,0.35))';
   drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid});
-  ctx.filter='none';
-  ctx.restore();
   for(const to of curTorches())drawTorchAt(to,t);
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
