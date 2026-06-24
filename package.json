@@ -1,0 +1,45 @@
+{
+  "name": "dungeonfolk-mims-adventure",
+  "version": "0.7.0",
+  "description": "Dungeonfolk: Mim's Adventure — stealth puzzle game",
+  "main": "electron/main.js",
+  "scripts": {
+    "start":     "electron .",
+    "build:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "steamworks.js": "^0.3.1"
+  },
+  "devDependencies": {
+    "electron":         "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId":       "com.dungeonfolk.mimsadventure",
+    "productName": "Dungeonfolk Mim's Adventure",
+    "copyright":   "Copyright © 2024",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "electron/**",
+      "levels/**",
+      "!levels/**/*.md",
+      "!levels/README.md"
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
