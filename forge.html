@@ -1847,9 +1847,9 @@ let palCollapsed=new Set(['Walls','Decals (cosmetic)']);
 function buildPalette(){
   const pal=document.getElementById('palette'); pal.innerHTML='';
   let body=null, secEl=null, secName='';
-  const tileLabels=level.tileLabels||{};
-  const customFloors=(level.customTiles||[]).filter(t=>t.kind==='floor');
-  const customWalls=(level.customTiles||[]).filter(t=>t.kind==='wall');
+  const tileLabels=(level&&level.tileLabels)||{};
+  const customFloors=((level&&level.customTiles)||[]).filter(t=>t.kind==='floor');
+  const customWalls=((level&&level.customTiles)||[]).filter(t=>t.kind==='wall');
 
   function makeCtBtn(ct){
     const toolId='ct:'+ct.id;
