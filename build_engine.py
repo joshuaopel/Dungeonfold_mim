@@ -8,7 +8,7 @@ import sys,os
 MARK_OPEN='/* ===== SHARED ENGINE (generated from engine.js — do not edit here; run build_engine.py) ===== */'
 MARK_CLOSE='/* ===== END SHARED ENGINE ===== */'
 import sys as _s
-TARGETS=_s.argv[1:] or ['dungeonfolk-mims-adventure.html','dungeonfolk-forge.html']
+TARGETS=_s.argv[1:] or ['index.html','forge.html']
 
 def sync(engine_body, html_fn):
     s=open(html_fn,encoding='utf-8').read()

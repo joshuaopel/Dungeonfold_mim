@@ -1,5 +1,3 @@
-# Place this at .github/workflows/deploy-pages.yml
-# Then: repo Settings -> Pages -> Build and deployment -> Source: GitHub Actions
 name: Deploy to GitHub Pages
 on:
   push:

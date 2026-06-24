@@ -25,7 +25,7 @@
   input[type=number]{width:54px}
   #editorBar{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;z-index:12}
   #editorBar .sep{width:2px;height:24px;background:var(--panelB);margin:0 2px}
-  #palette{position:fixed;left:8px;top:64px;bottom:8px;width:186px;padding:8px 8px 12px;overflow-y:auto;z-index:10}
+  #palette{position:fixed;left:8px;top:64px;bottom:8px;width:226px;padding:8px 8px 12px;overflow-y:auto;z-index:10}
   .palSec{margin-bottom:1px}
   .palHead{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#9384b3;padding:7px 4px 4px;user-select:none;border-top:1px solid rgba(255,255,255,0.05)}
   .palSec:first-child .palHead{border-top:none}
@@ -41,7 +41,12 @@
   .tool:hover{background:#3a2d52}
   .tool.active{border-color:var(--gold);background:#3a2d52}
   .tool .sw{width:18px;height:18px;border-radius:4px;flex:none;border:1px solid rgba(0,0,0,.4)}
-  #selPanel{position:fixed;right:8px;top:64px;width:236px;max-height:calc(100% - 72px);overflow-y:auto;z-index:13;padding:10px;font-size:12px;color:#cdbfe8}
+  .ctColor{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+  .ctDel{margin-left:auto;opacity:0;font-size:10px;color:#ff6b6b;padding:0 2px;line-height:1;cursor:pointer;flex:none}
+  .tool:hover .ctDel{opacity:1}
+  .palAdd{color:#9384b3;font-size:11px;justify-content:center;border:1px dashed rgba(147,132,179,0.35)!important;margin-top:3px}
+  .palAdd:hover{color:#e7dcff;border-color:rgba(147,132,179,0.7)!important;background:#3a2d52!important}
+  #selPanel{position:fixed;right:8px;top:64px;width:280px;max-height:calc(100% - 72px);overflow-y:auto;z-index:13;padding:10px;font-size:12px;color:#cdbfe8}
   .inspHead{display:flex;align-items:center;gap:8px;margin-bottom:9px}
   .inspHead #selLabel{flex:1;font-weight:800;font-size:13px;color:#f3e7c0;text-transform:capitalize}
   .inspRow{display:flex;flex-direction:column;gap:6px}
@@ -58,8 +63,8 @@
   .propRow label.chk{display:flex;align-items:center;gap:6px;cursor:pointer}
   #selPanel.hidden{display:none}
   #selPanel button{font-size:11px;padding:3px 9px}
-  #editorHint{position:fixed;bottom:8px;left:168px;right:8px;text-align:center;font-size:12px;color:#b9a8d6;z-index:10;padding:6px;pointer-events:none}
-  #artPanel,#storyPanel,#libPanel,#enemyPanel{position:fixed;right:8px;top:64px;bottom:8px;width:218px;padding:10px;overflow-y:auto;z-index:11}
+  #editorHint{position:fixed;bottom:8px;left:242px;right:8px;text-align:center;font-size:12px;color:#b9a8d6;z-index:10;padding:6px;pointer-events:none}
+  #artPanel,#storyPanel,#libPanel,#enemyPanel{position:fixed;right:8px;top:64px;bottom:8px;width:262px;padding:10px;overflow-y:auto;z-index:11}
   #enemyPanel.wide{width:460px}
   .enCard{border:1px solid #3b2f58;border-radius:8px;padding:7px;margin-bottom:8px;background:rgba(20,14,32,0.5)}
   .enCard input[type=text]{width:100%;margin-bottom:5px}
@@ -219,6 +224,7 @@ input[type=color]{padding:0}
   <button id="btnEnemies">👁 Enemies</button>
   <div style="flex:1"></div>
   <button class="primary" id="btnPlaytest">▶ Playtest</button>
+  <a href="index.html" style="font-size:11px;color:var(--parchment);text-decoration:none;white-space:nowrap;opacity:.65;padding-left:6px">← Game</a>
 </div>
 
 <div id="palette" class="panel hidden"></div>
@@ -520,6 +526,19 @@ function paintTile(g,id,v){
     g.strokeStyle='rgba(155,95,208,0.18)';g.lineWidth=1;
     for(let i=0;i<3+(v&1);i++){const x=R()*64,y=8+R()*50;g.beginPath();g.moveTo(x,y);g.lineTo(x+R()*20-10,y+R()*18);g.stroke();}
     F('rgba(255,255,255,0.06)');g.fillRect(R()*50,10+R()*40,8,2);
+  } else if(TILE_DEFS[id]){
+    const col=TILE_DEFS[id].color||'#3a2d4e';
+    F(col);g.fillRect(0,0,TS,TS);
+    if(TILE_DEFS[id].kind==='wall'){
+      F('rgba(255,255,255,0.10)');g.fillRect(0,0,TS,8);
+      g.strokeStyle='rgba(0,0,0,0.18)';g.lineWidth=1;
+      for(let yy=22;yy<TS;yy+=20){g.beginPath();g.moveTo(0,yy+0.5);g.lineTo(TS,yy+0.5);g.stroke();}
+      const off=(v%2)*16;
+      for(let row2=0;row2<3;row2++){const yy=8+row2*20,o2=(row2%2?off:off+16)%32;for(let xx=o2;xx<TS;xx+=32){g.beginPath();g.moveTo(xx+0.5,yy);g.lineTo(xx+0.5,Math.min(yy+20,TS));g.stroke();}}
+    }else{
+      g.strokeStyle='rgba(0,0,0,0.10)';g.lineWidth=1;
+      for(let i=0;i<2;i++){const x=(v*17+i*23)%50+7,y=(v*31+i*19)%50+7;g.beginPath();g.moveTo(x,y);g.lineTo(x+12,y+14);g.stroke();}
+    }
   }
 }
 function buildTileCache(){
@@ -1169,8 +1188,8 @@ function drawGbPops(t,editor){
       if(m&&popCtx.setTransform)popCtx.setTransform(m);
       ctx=popCtx; for(const draw of groups[v]) draw(); ctx=real;
       try{
-        if(px&&gbCtx&&gbCtx.getImageData){
-          // pixelate to the scene's Px: downscale -> (recolour) -> nearest upscale, aligned to screen
+        if((px||key!=='full')&&gbCtx&&gbCtx.getImageData){
+          // all recoloured pops route through the cheap downscaled buffer (same as the scene filter)
           const P=Math.max(1,Math.min(12,Math.round((level.gb&&level.gb.px)||5)));
           const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
           if(gbBuf.width!==lowW||gbBuf.height!==lowH){ gbBuf.width=lowW; gbBuf.height=lowH; }
@@ -1180,9 +1199,8 @@ function drawGbPops(t,editor){
           popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(0,0,vw,vh); popCtx.imageSmoothingEnabled=false;
           popCtx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);
         } else if(key!=='full'){
-          recolor(popCtx,vw,vh,key,false);     // crisp recolour (full-res)
+          recolor(popCtx,vw,vh,key,false);   // headless fallback: no downscaled buf available
         }
-        // (px + 'full' with no recolor path: popBuf already holds the pixelated full-colour element)
       }catch(e){}
       real.setTransform(1,0,0,1,0,0); real.drawImage(popBuf,0,0);
       if(m&&real.setTransform)real.setTransform(m);
@@ -1392,7 +1410,8 @@ function blankLevel(cols,rows){
   return { name:'My Dungeon', cols, rows, goal:15, blurb:'', author:'', music:null, musicName:'', v:2, intro:[], outro:[], assets:{}, aidn:0, ambient:0.5, objDefs:[], objects:[], odn:0, mode:'heist', enemyDefs:[], endn:0, gb:{on:false,scheme:'dmg',px:5,player:0},
     tiles:new Array(cols*rows).fill(0),
     spawn:{x:TS*2.5,y:TS*2.5}, portal:{x:TS*(cols-2.5),y:TS*(rows-2.5)},
-    props:[], treasures:[], heroes:[], torches:[], decals:[], inter:[], links:[], iid:1, art:{} };
+    props:[], treasures:[], heroes:[], torches:[], decals:[], inter:[], links:[], iid:1, art:{},
+    customTiles:[], tileLabels:{} };
 }
 const setT=(lv,c,r,v)=>{ if(c>=0&&r>=0&&c<lv.cols&&r<lv.rows) lv.tiles[r*lv.cols+c]=v; };
 function autoWall(lv){
@@ -1593,6 +1612,15 @@ function loadArtImages(lv,done){
     im.onerror=()=>{if(--pending===0&&done)done();};
     im.src=url;
   }
+  for(const ct of (lv.customTiles||[])){
+    const key='ctile_'+ct.id; delete artImgs[key];
+    const url=lv.art[key]; if(!url) continue;
+    pending++;
+    const im=new Image();
+    im.onload=(k2=>()=>{tagFrames(im);artImgs[k2]=im;if(--pending===0&&done)done();})(key);
+    im.onerror=()=>{if(--pending===0&&done)done();};
+    im.src=url;
+  }
   for(const k of Object.keys(assetImgs))delete assetImgs[k];
   for(const k of Object.keys(defImgs))delete defImgs[k];
   for(const d of (lv.objDefs||[])){
@@ -1639,6 +1667,31 @@ function refreshArtPanel(){
     cl.onclick=()=>{delete level.art[key];delete artImgs[key];refreshArtPanel();};
     row.append(th,lb,up,fi,cl);
     wrap.appendChild(row);
+  }
+  /* ---- custom tile textures ---- */
+  if((level.customTiles||[]).length){
+    const cth=document.createElement('h4'); cth.textContent='Custom Tile Textures'; wrap.appendChild(cth);
+    for(const ct of level.customTiles){
+      const key='ctile_'+ct.id;
+      const row=document.createElement('div'); row.className='artRow';
+      const th=document.createElement('div'); th.className='thumb';
+      if(level.art[key]) th.style.backgroundImage='url('+level.art[key]+')';
+      else{ th.style.background=ct.color||'#3a2d4e'; }
+      const lb=document.createElement('label'); lb.textContent=ct.name+(artImgs[key]&&artImgs[key].frames>1?' ('+artImgs[key].frames+'f)':'');
+      const up=document.createElement('button'); up.className='up'; up.textContent='Upload';
+      const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*'; fi.className='hidden';
+      up.onclick=()=>fi.click();
+      fi.onchange=(k2=>()=>{
+        const f=fi.files[0]; if(!f) return;
+        const rd=new FileReader();
+        rd.onload=()=>{level.art[k2]=rd.result;loadArtImages(level);refreshArtPanel();};
+        rd.readAsDataURL(f);
+      })(key);
+      const cl=document.createElement('button'); cl.className='clr'; cl.textContent='✕';
+      cl.onclick=(k2=>()=>{delete level.art[k2];delete artImgs[k2];refreshArtPanel();})(key);
+      row.append(th,lb,up,fi,cl);
+      wrap.appendChild(row);
+    }
   }
   /* ---- background music ---- */
   const mh=document.createElement('h4'); mh.textContent='Background Music'; wrap.appendChild(mh);
@@ -1713,7 +1766,9 @@ function applySnap(s){
   level.objDefs=odefs||[];level.objects=level.objects||[];
   level.decals=level.decals||[];
   level.inter=level.inter||[];level.links=level.links||[];level.iid=level.iid||1;
+  level.customTiles=level.customTiles||[];level.tileLabels=level.tileLabels||{};
   ed.sel=null; ed.selHero=null; ed.drag=null;
+  syncCustomTiles(); buildTileCache(); buildPalette();
   syncBarFromLevel();
 }
 function undo(){ if(!undoStack.length)return; redoStack.push(snapLevel()); applySnap(undoStack.pop()); refreshUndoButtons(); }
@@ -1721,6 +1776,44 @@ function redo(){ if(!redoStack.length)return; undoStack.push(snapLevel()); apply
 function refreshUndoButtons(){
   document.getElementById('btnUndo').disabled=!undoStack.length;
   document.getElementById('btnRedo').disabled=!redoStack.length;
+}
+
+/* =========================================================
+   CUSTOM TILES
+   ========================================================= */
+function syncCustomTiles(){
+  for(const td of (level.customTiles||[])){
+    TILE_DEFS[td.id]={kind:td.kind,label:td.name,color:td.color};
+    TILE_ART[td.id]='ctile_'+td.id;
+  }
+}
+function sanitizeCustomTiles(raw){
+  const out=[];
+  for(const ct of (Array.isArray(raw)?raw:[])){
+    if(!ct||!ct.id||![1,0].includes(ct.id!==undefined)){ /* skip bogus */ }
+    const id=+ct.id; if(!(id>=12&&Number.isFinite(id))) continue;
+    out.push({id,kind:(ct.kind==='wall'?'wall':'floor'),name:String(ct.name||'Custom').slice(0,40),color:String(ct.color||'#5a4070')});
+  }
+  return out;
+}
+function nextCustomId(){
+  const ids=(level.customTiles||[]).map(t=>t.id);
+  return ids.length?Math.max(...ids)+1:12;
+}
+function addCustomTile(kind){
+  pushUndo();
+  const id=nextCustomId();
+  level.customTiles=level.customTiles||[];
+  level.customTiles.push({id,kind,name:(kind==='wall'?'Custom Wall':'Custom Floor'),color:(kind==='wall'?'#5a4070':'#3d6550')});
+  syncCustomTiles(); buildTileCache(); buildPalette();
+  setTool('ct:'+id);
+}
+function deleteCustomTile(id){
+  pushUndo();
+  level.customTiles=(level.customTiles||[]).filter(t=>t.id!==id);
+  level.tiles=level.tiles.map(t=>t===id?0:t);
+  delete TILE_DEFS[id]; delete TILE_ART[id];
+  buildTileCache(); buildPalette(); refreshArtPanel();
 }
 
 const TOOLS=[
@@ -1753,10 +1846,56 @@ const TOOLS=[
 let palCollapsed=new Set(['Walls','Decals (cosmetic)']);
 function buildPalette(){
   const pal=document.getElementById('palette'); pal.innerHTML='';
-  let body=null;
+  let body=null, secEl=null, secName='';
+  const tileLabels=level.tileLabels||{};
+  const customFloors=(level.customTiles||[]).filter(t=>t.kind==='floor');
+  const customWalls=(level.customTiles||[]).filter(t=>t.kind==='wall');
+
+  function makeCtBtn(ct){
+    const toolId='ct:'+ct.id;
+    const b=document.createElement('button'); b.className='tool'; b.dataset.tool=toolId;
+    const ci=document.createElement('input'); ci.type='color'; ci.value=ct.color||'#3d6550';
+    ci.className='ctColor'; ci.title='Click to change tile colour';
+    ci.onclick=ev=>ev.stopPropagation();
+    ci.oninput=()=>{ct.color=ci.value;if(TILE_DEFS[ct.id])TILE_DEFS[ct.id].color=ct.color;buildTileCache();b.querySelector('.sw').style.background=ct.color;};
+    const sw=document.createElement('span'); sw.className='sw'; sw.style.background=ct.color||'#3d6550';
+    sw.title='Click to change colour'; sw.onclick=ev=>{ev.stopPropagation();ci.click();};
+    b.appendChild(sw); b.appendChild(ci); b.appendChild(document.createTextNode(ct.name||'Custom'));
+    b.onclick=()=>setTool(toolId);
+    b.ondblclick=e=>{e.stopPropagation();const n=prompt('Rename tile:',ct.name||'Custom');if(n!=null&&n.trim()){ct.name=n.trim().slice(0,40);if(TILE_DEFS[ct.id])TILE_DEFS[ct.id].label=ct.name;buildPalette();}};
+    const del=document.createElement('span'); del.textContent='✕'; del.className='ctDel';
+    del.title='Delete tile type — erases all painted tiles of this type';
+    del.onclick=ev=>{ev.stopPropagation();if(confirm('Delete "'+ct.name+'" and erase all tiles of this type?'))deleteCustomTile(ct.id);};
+    b.appendChild(del);
+    return b;
+  }
+
+  function finishSection(){
+    if(!secEl) return;
+    if(secName==='Floors'){
+      for(const ct of customFloors){
+        body.appendChild(makeCtBtn(ct));
+        secEl._n=(secEl._n||0)+1; if(secEl._cnt)secEl._cnt.textContent=secEl._n;
+      }
+      const ab=document.createElement('button'); ab.className='tool palAdd';
+      ab.textContent='＋ Add custom floor'; ab.onclick=()=>addCustomTile('floor');
+      body.appendChild(ab);
+    }
+    if(secName==='Walls'){
+      for(const ct of customWalls){
+        body.appendChild(makeCtBtn(ct));
+        secEl._n=(secEl._n||0)+1; if(secEl._cnt)secEl._cnt.textContent=secEl._n;
+      }
+      const ab=document.createElement('button'); ab.className='tool palAdd';
+      ab.textContent='＋ Add custom wall'; ab.onclick=()=>addCustomTile('wall');
+      body.appendChild(ab);
+    }
+  }
+
   for(const t of TOOLS){
     if(t[0]==='h4'){
-      const name=t[1];
+      finishSection();
+      const name=t[1]; secName=name;
       const sec=document.createElement('div'); sec.className='palSec'+(palCollapsed.has(name)?' collapsed':'');
       const head=document.createElement('div'); head.className='palHead';
       const chev=document.createElement('span'); chev.className='chev'; chev.textContent='▾';
@@ -1766,17 +1905,23 @@ function buildPalette(){
       body=document.createElement('div'); body.className='palBody';
       head.onclick=()=>{ if(palCollapsed.has(name))palCollapsed.delete(name); else palCollapsed.add(name); sec.classList.toggle('collapsed'); };
       sec.append(head,body); pal.appendChild(sec);
-      sec._cnt=cnt; sec._n=0;
+      sec._cnt=cnt; sec._n=0; secEl=sec;
       continue;
     }
-    const b=document.createElement('button'); b.className='tool'; b.dataset.tool=t[0];
+    const toolId=t[0];
+    const displayName=tileLabels[toolId]||t[1];
+    const b=document.createElement('button'); b.className='tool'; b.dataset.tool=toolId;
     const sw=document.createElement('span'); sw.className='sw'; sw.style.background=t[2];
-    b.appendChild(sw); b.appendChild(document.createTextNode(t[1]));
-    b.onclick=()=>setTool(t[0]);
+    b.appendChild(sw); b.appendChild(document.createTextNode(displayName));
+    b.onclick=()=>setTool(toolId);
+    if(secName==='Floors'||secName==='Walls'){
+      b.ondblclick=e=>{e.stopPropagation();const n=prompt('Rename this tile (this level only):',displayName);if(n!=null&&n.trim()){level.tileLabels=level.tileLabels||{};level.tileLabels[toolId]=n.trim().slice(0,40);buildPalette();}};
+    }
     (body||pal).appendChild(b);
-    const sec=body&&body.parentElement; if(sec){ sec._n=(sec._n||0)+1; if(sec._cnt)sec._cnt.textContent=sec._n; }
+    if(secEl){ secEl._n=(secEl._n||0)+1; if(secEl._cnt)secEl._cnt.textContent=secEl._n; }
   }
-  setTool('select');
+  finishSection();
+  setTool(ed.tool||'select');
 }
 function setTool(t){
   ed.tool=t;
@@ -1787,6 +1932,7 @@ function setTool(t){
   { const act=document.querySelector('.tool.active'); if(act&&act.closest){ const sec=act.closest('.palSec'); if(sec&&sec.classList&&sec.classList.contains('collapsed')){ const nm=sec.querySelector&&sec.querySelector('.palHead span:nth-child(2)'); sec.classList.remove('collapsed'); if(nm&&palCollapsed)palCollapsed.delete(nm.textContent); } } }
   if(typeof t==='string'&&t.indexOf('obj:')===0){const _d=objDefById(t.slice(4));document.getElementById('editorHint').textContent='Stamping "'+((_d&&_d.name)||'object')+'". Click the map to place'+((_d&&_d.snap)?' (snaps to grid)':'')+'. Switch to Select to move or delete copies.';return;}
   if(typeof t==='string'&&t.indexOf('enemy:')===0){const _e=(level.enemyDefs||[]).find(e=>e.id===t.slice(6));document.getElementById('editorHint').textContent='Placing "'+((_e&&_e.name)||'enemy')+'". Click to drop the invader, then click again to add patrol waypoints.';return;}
+  if(typeof t==='string'&&t.indexOf('ct:')===0){const _id=+t.slice(3);const _ct=(level.customTiles||[]).find(c=>c.id===_id);document.getElementById('editorHint').textContent='Left-drag to paint "'+((_ct&&_ct.name)||'custom tile')+'". Double-click its palette button to rename it.';return;}
   const hints={
     select:'Drag entities, patrol points, spawn, or portal to move them. Click empty space and drag to pan. Right-click or Delete removes the selection.',
     floor:'Left-drag to paint floor. Heroes and the Mimic can only walk on floor.',
@@ -2176,6 +2322,7 @@ function applyTool(wx,wy,isDrag){
   const c=Math.floor(wx/TS), r=Math.floor(wy/TS);
   const t=ed.tool;
   if(TOOL_TILE[t]!==undefined){setT(level,c,r,TOOL_TILE[t]);return;}
+  if(typeof t==='string'&&t.indexOf('ct:')===0){setT(level,c,r,+t.slice(3));return;}
   if(t==='erase'){
     const hit=entityAt(wx,wy);
     if(hit){hit.arr.splice(hit.i,1);if(ed.selHero===hit.e)ed.selHero=null;pruneLinks();return;}
@@ -2359,6 +2506,9 @@ document.getElementById('fileImport').onchange=e=>{
       if(!lv.tiles||!lv.cols) throw 0;
       pushUndo();
       level=Object.assign(blankLevel(lv.cols,lv.rows),lv);
+      level.customTiles=sanitizeCustomTiles(level.customTiles);
+      level.tileLabels=(level.tileLabels&&typeof level.tileLabels==='object')?level.tileLabels:{};
+      syncCustomTiles(); buildTileCache();
       level.tiles=level.tiles.map(t=>TILE_DEFS[t]?t:0);
       level.decals=(level.decals||[]).filter(d=>DECAL_KINDS[d.kind]);
       if(!(typeof level.music==='string'&&level.music.startsWith('data:audio'))){level.music=null;level.musicName='';}
@@ -2405,6 +2555,7 @@ document.getElementById('fileImport').onchange=e=>{
       level.ambient=(level.ambient==null||isNaN(+level.ambient))?0.5:clamp(+level.ambient,0,0.92);
 
       level.v=2;
+      buildPalette();
       loadArtImages(level); refreshArtPanel(); syncBarFromLevel();
     }catch(err){ alert('That file doesn\u2019t look like a Dungeonfolk level.'); }
   };
@@ -3209,6 +3360,9 @@ function tryRestoreDraft(){
     const o=JSON.parse(d);
     if(!o||!o.tiles||!confirm('Restore your last editing session ("'+(o.name||'Untitled')+'")?'))return;
     level=Object.assign(blankLevel(o.cols||48,o.rows||30),o);
+    level.customTiles=sanitizeCustomTiles(level.customTiles);
+    level.tileLabels=(level.tileLabels&&typeof level.tileLabels==='object')?level.tileLabels:{};
+    syncCustomTiles(); buildTileCache();
     level.tiles=level.tiles.map(t=>TILE_DEFS[t]?t:0);
     level.decals=(level.decals||[]).filter(dd=>DECAL_KINDS[dd.kind]);
     if(!(typeof level.music==='string'&&level.music.startsWith('data:audio'))){level.music=null;level.musicName='';}
@@ -3255,6 +3409,7 @@ function tryRestoreDraft(){
       level.ambient=(level.ambient==null||isNaN(+level.ambient))?0.5:clamp(+level.ambient,0,0.92);
 
     level.v=2;
+    buildPalette();
     loadArtImages(level);
     syncBarFromLevel();
   }catch(e){}
