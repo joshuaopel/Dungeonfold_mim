@@ -3314,10 +3314,10 @@ function renderEditor(t){
     ctx.strokeStyle='#ffe082';ctx.lineWidth=3/ed.zoom;
     ctx.beginPath();ctx.arc(ed.sel.ref.x,ed.sel.ref.y,22,0,TAU);ctx.stroke();
   }
-  ctx.save();ctx.translate(level.spawn.x,level.spawn.y);
-  vecMimic(t,null);
+  drawPropAt('mimic',level.spawn.x,level.spawn.y,t,false,null);
+  ctx.save();
   ctx.fillStyle='#c8b6e8';ctx.font='bold 11px Nunito';ctx.textAlign='center';
-  ctx.fillText('SPAWN',0,30);
+  ctx.fillText('SPAWN',level.spawn.x,level.spawn.y+30);
   ctx.restore();
   if(ed.sel&&ed.sel.type==='spawn'){
     ctx.strokeStyle='#ffe082';ctx.lineWidth=3/ed.zoom;
