@@ -811,6 +811,20 @@ function applyGameBoy(px,scheme,colors){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
+function applyColorClamp(scheme,colors){
+  try{
+    if(scheme==='native')return;
+    const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    ctx.setTransform(1,0,0,1,0,0);
+    const img=ctx.getImageData(0,0,vw,vh),d=img.data,W=vw,H=vh;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const i=(y*W+x)*4; if(d[i+3]<8)continue;
+      const lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+      const c=PAL[gbLevel(lum)]; d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;
+    }
+    ctx.putImageData(img,0,0);
+  }catch(e){}
+}
 // Normalise a gbPop tag. Value = 0 (off) | 'full' | a scheme name | 'custom', with an optional
 // trailing '*' meaning "pixelate this pop to match the scene's block size". Legacy 1/true -> 'full'.
 const gbPopVal=v=>{
