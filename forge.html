@@ -1801,10 +1801,13 @@ function nextCustomId(){
   return ids.length?Math.max(...ids)+1:12;
 }
 function addCustomTile(kind){
+  const defaultName=kind==='wall'?'Custom Wall':'Custom Floor';
+  const name=prompt('Name this tile:',defaultName);
+  if(name===null) return;
   pushUndo();
   const id=nextCustomId();
   level.customTiles=level.customTiles||[];
-  level.customTiles.push({id,kind,name:(kind==='wall'?'Custom Wall':'Custom Floor'),color:(kind==='wall'?'#5a4070':'#3d6550')});
+  level.customTiles.push({id,kind,name:(name.trim().slice(0,40)||defaultName),color:(kind==='wall'?'#5a4070':'#3d6550')});
   syncCustomTiles(); buildTileCache(); buildPalette(); refreshArtPanel();
   setTool('ct:'+id);
 }
