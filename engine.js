@@ -189,6 +189,19 @@ function paintTile(g,id,v){
     g.strokeStyle='rgba(155,95,208,0.18)';g.lineWidth=1;
     for(let i=0;i<3+(v&1);i++){const x=R()*64,y=8+R()*50;g.beginPath();g.moveTo(x,y);g.lineTo(x+R()*20-10,y+R()*18);g.stroke();}
     F('rgba(255,255,255,0.06)');g.fillRect(R()*50,10+R()*40,8,2);
+  } else if(TILE_DEFS[id]){
+    const col=TILE_DEFS[id].color||'#3a2d4e';
+    F(col);g.fillRect(0,0,TS,TS);
+    if(TILE_DEFS[id].kind==='wall'){
+      F('rgba(255,255,255,0.10)');g.fillRect(0,0,TS,8);
+      g.strokeStyle='rgba(0,0,0,0.18)';g.lineWidth=1;
+      for(let yy=22;yy<TS;yy+=20){g.beginPath();g.moveTo(0,yy+0.5);g.lineTo(TS,yy+0.5);g.stroke();}
+      const off=(v%2)*16;
+      for(let row2=0;row2<3;row2++){const yy=8+row2*20,o2=(row2%2?off:off+16)%32;for(let xx=o2;xx<TS;xx+=32){g.beginPath();g.moveTo(xx+0.5,yy);g.lineTo(xx+0.5,Math.min(yy+20,TS));g.stroke();}}
+    }else{
+      g.strokeStyle='rgba(0,0,0,0.10)';g.lineWidth=1;
+      for(let i=0;i<2;i++){const x=(v*17+i*23)%50+7,y=(v*31+i*19)%50+7;g.beginPath();g.moveTo(x,y);g.lineTo(x+12,y+14);g.stroke();}
+    }
   }
 }
 function buildTileCache(){
