@@ -1524,7 +1524,7 @@ function drawDecal(d){
 
 /* ---------- level data ---------- */
 function blankLevel(cols,rows){
-  return {name:'Dungeon',cols,rows,goal:15,blurb:'',author:'',music:null,musicName:'',v:2,intro:[],outro:[],assets:{},aidn:0,ambient:0.5,objDefs:[],objects:[],odn:0,mode:'heist',enemyDefs:[],endn:0,gb:{on:false,scheme:'dmg',px:5},
+  return {name:'Dungeon',cols,rows,goal:15,blurb:'',author:'',music:null,musicName:'',v:2,intro:[],outro:[],assets:{},aidn:0,ambient:0.5,objDefs:[],objects:[],odn:0,mode:'heist',enemyDefs:[],endn:0,gb:{on:false,scheme:'dmg',px:5,pixelate:true},
     tiles:new Array(cols*rows).fill(0),
     spawn:{x:TS*2.5,y:TS*2.5},portal:{x:TS*(cols-2.5),y:TS*(rows-2.5)},
     props:[],treasures:[],heroes:[],torches:[],decals:[],inter:[],links:[],iid:1,art:{}};
@@ -1561,7 +1561,7 @@ function sanitizeLevel(raw){
     }
   }
   lv.endn=Math.max(0,+raw.endn||0);
-  lv.gb={ on:!!(raw.gb&&raw.gb.on), scheme:(raw.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(raw.gb.scheme))?raw.gb.scheme:'dmg', px:clamp(Math.round((raw.gb&&+raw.gb.px)||5),1,12), colors:(raw.gb&&Array.isArray(raw.gb.colors)&&raw.gb.colors.length===4)?raw.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(raw.gb&&raw.gb.player) };
+  lv.gb={ on:!!(raw.gb&&raw.gb.on), scheme:(raw.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(raw.gb.scheme))?raw.gb.scheme:'dmg', px:clamp(Math.round((raw.gb&&+raw.gb.px)||5),1,12), colors:(raw.gb&&Array.isArray(raw.gb.colors)&&raw.gb.colors.length===4)?raw.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(raw.gb&&raw.gb.player), pixelate:!(raw.gb&&raw.gb.pixelate===false) };
   lv.blurb=String(raw.blurb||'').slice(0,140);
   lv.author=String(raw.author||'').slice(0,40);
   if(typeof raw.music==='string'&&raw.music.startsWith('data:audio')){
@@ -2211,7 +2211,7 @@ function startPlay(){
     player:{x:level.spawn.x,y:level.spawn.y,form:'chest',sneak:false,face:0,moving:false,
             eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
     portal:{x:level.portal.x,y:level.portal.y,r:34,active:false,spin:0},
-    runTime:0,detections:0,chaos:0,goalValue:0,decoyId:0,mode:level.mode||'heist',invaderLoot:0,gb:level.gb||{on:false,scheme:'dmg',px:5},
+    runTime:0,detections:0,chaos:0,goalValue:0,decoyId:0,mode:level.mode||'heist',invaderLoot:0,gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
     goal:Math.min(level.goal,Math.max(total,1)),showMap:true,over:false,paused:false,
     torches:level.torches.map(to=>({...to,on:!!(to.start==null?1:to.start)})),
     inter:level.inter.map(it=>({...it,active:false,flip:false,open:!!it.init,on:!!it.init,prevOpen:null,prevOn:null,picked:false,show:(it.kind==='hint'&&it.mode==='label')?1:0})),
