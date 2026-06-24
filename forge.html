@@ -1170,8 +1170,8 @@ function drawGbPops(t,editor){
       if(m&&popCtx.setTransform)popCtx.setTransform(m);
       ctx=popCtx; for(const draw of groups[v]) draw(); ctx=real;
       try{
-        if(px&&gbCtx&&gbCtx.getImageData){
-          // pixelate to the scene's Px: downscale -> (recolour) -> nearest upscale, aligned to screen
+        if((px||key!=='full')&&gbCtx&&gbCtx.getImageData){
+          // all recoloured pops route through the cheap downscaled buffer (same as the scene filter)
           const P=Math.max(1,Math.min(12,Math.round((level.gb&&level.gb.px)||5)));
           const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
           if(gbBuf.width!==lowW||gbBuf.height!==lowH){ gbBuf.width=lowW; gbBuf.height=lowH; }
@@ -1181,9 +1181,8 @@ function drawGbPops(t,editor){
           popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(0,0,vw,vh); popCtx.imageSmoothingEnabled=false;
           popCtx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);
         } else if(key!=='full'){
-          recolor(popCtx,vw,vh,key,false);     // crisp recolour (full-res)
+          recolor(popCtx,vw,vh,key,false);   // headless fallback: no downscaled buf available
         }
-        // (px + 'full' with no recolor path: popBuf already holds the pixelated full-colour element)
       }catch(e){}
       real.setTransform(1,0,0,1,0,0); real.drawImage(popBuf,0,0);
       if(m&&real.setTransform)real.setTransform(m);
