@@ -1805,7 +1805,7 @@ function addCustomTile(kind){
   const id=nextCustomId();
   level.customTiles=level.customTiles||[];
   level.customTiles.push({id,kind,name:(kind==='wall'?'Custom Wall':'Custom Floor'),color:(kind==='wall'?'#5a4070':'#3d6550')});
-  syncCustomTiles(); buildTileCache(); buildPalette();
+  syncCustomTiles(); buildTileCache(); buildPalette(); refreshArtPanel();
   setTool('ct:'+id);
 }
 function deleteCustomTile(id){
