@@ -803,9 +803,11 @@ function drawTorchAt(p,t){
    the unlit areas are (0 = lighting off, backward-compatible)
    ========================================================= */
 let lightCanvas=null,lightCtx=null;
-function applyLighting(t,camX,camY,zoom){
+// Build the lightmap into lightCanvas but do NOT multiply onto ctx.
+// Returns true if lighting is active (ambient>0).
+function buildLightmap(t,camX,camY,zoom){
   const amb=(level.ambient==null?0:level.ambient);
-  if(amb<=0)return;
+  if(amb<=0)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
   if(!lightCanvas)lightCanvas=document.createElement('canvas');
   if(!lightCtx||lightCanvas.width!==vw||lightCanvas.height!==vh){lightCanvas.width=vw;lightCanvas.height=vh;lightCtx=lightCanvas.getContext('2d');}
@@ -838,6 +840,10 @@ function applyLighting(t,camX,camY,zoom){
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
+  return true;
+}
+function applyLighting(t,camX,camY,zoom){
+  if(!buildLightmap(t,camX,camY,zoom))return;
   ctx.setTransform(1,0,0,1,0,0);
   ctx.globalCompositeOperation='multiply';
   ctx.drawImage(lightCanvas,0,0);
@@ -878,6 +884,81 @@ const GB_SCHEMES={
 const GB_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 function gbLevel(lum,n){ n=n||4; const l=Math.floor(lum*n); return l<0?0:l>=n?n-1:l; }
 let gbBuf=null,gbCtx=null;
+let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
+
+// Combined GB palette + lightmap pass. Call buildLightmap() first when ambient>0.
+// Formula: light level sets the available palette range [0..maxStop]; texture
+// luminance picks a stop within that range. This spreads all palette colors
+// across both lit and shadowed areas instead of crushing shadows to PAL[0].
+function applyGameBoyLit(px,scheme,colors,pixelate){
+  try{
+    const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    const n=PAL.length;
+    if(!gbBuf){gbBuf=document.createElement('canvas');gbCtx=gbBuf.getContext('2d',{willReadFrequently:true});}
+    if(!gbCtx||!gbCtx.getImageData)return;
+    const hasLight=!!(lightCtx&&lightCanvas&&lightCanvas.width===vw&&lightCanvas.height===vh);
+    if(pixelate!==false){
+      const P=Math.max(1,Math.min(12,Math.round(px||5)));
+      const lowW=Math.max(1,Math.ceil(vw/P)),lowH=Math.max(1,Math.ceil(vh/P));
+      if(gbBuf.width!==lowW||gbBuf.height!==lowH){gbBuf.width=lowW;gbBuf.height=lowH;}
+      gbCtx.imageSmoothingEnabled=false;
+      gbCtx.clearRect(0,0,lowW,lowH);
+      gbCtx.drawImage(cv,0,0,vw,vh,0,0,lowW,lowH);
+      let ld=null;
+      if(hasLight){
+        if(!_llBuf){_llBuf=document.createElement('canvas');_llCtx=_llBuf.getContext('2d',{willReadFrequently:true});}
+        if(_llBuf.width!==lowW||_llBuf.height!==lowH){_llBuf.width=lowW;_llBuf.height=lowH;}
+        _llCtx.drawImage(lightCanvas,0,0,vw,vh,0,0,lowW,lowH);
+        ld=_llCtx.getImageData(0,0,lowW,lowH).data;
+      }
+      const img=gbCtx.getImageData(0,0,lowW,lowH),d=img.data;
+      for(let y=0;y<lowH;y++)for(let x=0;x<lowW;x++){
+        const i=(y*lowW+x)*4;
+        const texLum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+        let c;
+        if(ld){
+          const lightLum=(ld[i]*0.299+ld[i+1]*0.587+ld[i+2]*0.114)/255;
+          const maxStop=Math.round(lightLum*(n-1));
+          c=PAL[Math.max(0,Math.min(maxStop,Math.round(texLum*(maxStop+1))))];
+        }else{
+          c=PAL[gbLevel(texLum,n)];
+        }
+        d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;
+      }
+      gbCtx.putImageData(img,0,0);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);
+      ctx.imageSmoothingEnabled=true;
+    }else{
+      if(gbBuf.width!==vw||gbBuf.height!==vh){gbBuf.width=vw;gbBuf.height=vh;}
+      gbCtx.drawImage(cv,0,0);
+      const img=gbCtx.getImageData(0,0,vw,vh);
+      const packed=new Uint32Array(n);
+      for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
+      const d32=new Uint32Array(img.data.buffer);
+      let ld=null;
+      if(hasLight) ld=lightCtx.getImageData(0,0,vw,vh).data;
+      for(let i=0,len=d32.length;i<len;i++){
+        const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
+        const texLum=(299*r+587*g+114*b)/255000;
+        let s;
+        if(ld){
+          const li=i*4;
+          const lightLum=(ld[li]*0.299+ld[li+1]*0.587+ld[li+2]*0.114)/255;
+          const maxStop=Math.round(lightLum*(n-1));
+          s=Math.max(0,Math.min(maxStop,Math.round(texLum*(maxStop+1))));
+        }else{
+          s=gbLevel(texLum,n);
+        }
+        d32[i]=packed[s];
+      }
+      gbCtx.putImageData(img,0,0);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.drawImage(gbBuf,0,0);
+    }
+  }catch(e){}
+}
 
 function applyGameBoy(px,scheme,colors){
   try{
