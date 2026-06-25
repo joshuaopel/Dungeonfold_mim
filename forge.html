@@ -206,6 +206,7 @@ input[type=color]{padding:0}
   <label style="font-size:11px" title="Game Boy palette">Pal <select id="edGBScheme"><option value="dmg">DMG Green</option><option value="grey">Pocket Grey</option><option value="dusk">Dusk Purple</option><option value="amber">Amber CRT</option><option value="ice">Ice Blue</option><option value="native">Native (no recolor)</option><option value="custom">Custom…</option></select></label>
   <span id="edGBCustom" style="display:none" title="Four shades, dark → light"><input type="color" id="edGBc0" style="width:24px;height:20px;padding:0;vertical-align:middle"><input type="color" id="edGBc1" style="width:24px;height:20px;padding:0;vertical-align:middle"><input type="color" id="edGBc2" style="width:24px;height:20px;padding:0;vertical-align:middle"><input type="color" id="edGBc3" style="width:24px;height:20px;padding:0;vertical-align:middle"></span>
   <label style="font-size:11px" title="Game Boy pixel size — 1 = full-resolution (color/dither only), higher = chunkier blocks.">Px <input type="range" id="edGBPx" min="1" max="12" value="5" style="width:66px;vertical-align:middle"></label>
+  <label style="font-size:11px" title="When checked, the scene is downscaled to chunky blocks (classic Game Boy look). Uncheck to apply only the color palette — full art resolution, no pixelation."><input type="checkbox" id="edGBPixelate" checked style="vertical-align:middle"> Pixelate</label>
   <label style="font-size:11px" title="Make the player pop in a chosen palette so you can always find yourself — visual only, does not affect stealth">Player <select id="edGBPlayer"><option value="0">Filtered</option><option value="full">Full colour</option><option value="dmg">DMG</option><option value="grey">Pocket</option><option value="dusk">Dusk</option><option value="amber">Amber</option><option value="ice">Ice</option><option value="custom">Custom</option></select></label>
   <label style="font-size:11px" title="Pixelate the player's pop to match the scene blocks"><input type="checkbox" id="edGBPlayerPx" style="vertical-align:middle"> px</label>
   <label style="font-size:11px">Size <input type="number" id="lvCols" value="48" min="12" max="120">×<input type="number" id="lvRows" value="30" min="10" max="120"></label>
@@ -1001,8 +1002,18 @@ function torchLit(to){ return (to&&to.on!=null)?!!to.on:((!to||to.start==null)?t
 function drawTorchAt(p,t){
   const fl=Math.sin(t*9+p.x)*2;
   const _c=(p.color&&p.color.length===3)?p.color:[255,176,92], _rgb=_c[0]+','+_c[1]+','+_c[2];
+  const _aim=(p.aid&&assetImgs[p.aid])||(p.glow?artImgs['beacon']:artImgs['torch'])||null;
+  function _spr(alpha){
+    if(!_aim)return false;
+    const fw=_aim.frameW||_aim.width;
+    const sx=stripSX(_aim,p.x*0.05+p.y*0.05,performance.now()/1000);
+    const s=40/Math.max(fw,_aim.height);
+    ctx.save();if(alpha!=null)ctx.globalAlpha=alpha;
+    ctx.drawImage(_aim,sx,0,fw,_aim.height,p.x-fw*s/2,p.y-_aim.height*s/2,fw*s,_aim.height*s);
+    ctx.restore();return true;
+  }
   if(!torchLit(p)){
-    if(p.aid&&assetImgs[p.aid]){ ctx.save();ctx.globalAlpha=0.3;drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);ctx.restore();return; }
+    if(_spr(0.3))return;
     if(p.glow){ ctx.strokeStyle='rgba('+_rgb+',0.3)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,6,0,TAU);ctx.stroke();return; }
     ctx.fillStyle='#4a3420';ctx.fillRect(p.x-3,p.y-2,6,14);
     ctx.fillStyle='rgba(110,84,58,0.7)';ctx.beginPath();ctx.ellipse(p.x,p.y-6,4,6,0,0,TAU);ctx.fill();
@@ -1013,7 +1024,7 @@ function drawTorchAt(p,t){
     const gb=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,R+12);
     gb.addColorStop(0,'rgba('+_rgb+',0.95)');gb.addColorStop(0.5,'rgba('+_rgb+',0.5)');gb.addColorStop(1,'rgba('+_rgb+',0)');
     ctx.fillStyle=gb;ctx.beginPath();ctx.arc(p.x,p.y,R+12,0,TAU);ctx.fill();
-    if(p.aid&&assetImgs[p.aid]){drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);return;}
+    if(_spr())return;
     ctx.fillStyle='rgb('+_rgb+')';ctx.beginPath();ctx.arc(p.x,p.y,7*br,0,TAU);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,0.85)';ctx.beginPath();ctx.arc(p.x,p.y,3,0,TAU);ctx.fill();
     return;
@@ -1023,7 +1034,7 @@ function drawTorchAt(p,t){
   const g=ctx.createRadialGradient(p.x,p.y,4,p.x,p.y,gr+fl*4);
   g.addColorStop(0,'rgba('+_rgb+','+(amb>0?0.5:0.30)+')');g.addColorStop(1,'rgba('+_rgb+',0)');
   ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,gr+fl*4,0,TAU);ctx.fill();
-  if(p.aid&&assetImgs[p.aid]){drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);return;}
+  if(_spr())return;
   ctx.fillStyle='#6b4a2c';ctx.fillRect(p.x-3,p.y-2,6,14);
   ctx.fillStyle='rgb('+_rgb+')';ctx.beginPath();ctx.ellipse(p.x,p.y-6+fl*0.5,5,9+fl,0,0,TAU);ctx.fill();
   ctx.fillStyle='rgba(255,255,236,0.92)';ctx.beginPath();ctx.ellipse(p.x,p.y-5,2.5,5,0,0,TAU);ctx.fill();
@@ -1137,6 +1148,31 @@ function applyGameBoy(px,scheme,colors){
     ctx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);   // integer upscale = crisp uniform pixels
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
+}
+function applyColorClamp(scheme,colors){
+  try{
+    if(scheme==='native')return;
+    const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
+    if(!gbCtx||!gbCtx.getImageData)return;
+    if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
+    gbCtx.drawImage(cv,0,0);
+    const img=gbCtx.getImageData(0,0,vw,vh);
+    const d32=new Uint32Array(img.data.buffer);
+    // Pre-pack palette as little-endian ABGR (matches canvas Uint32 layout: R|G<<8|B<<16|A<<24)
+    const p0=(0xFF000000|(PAL[0][2]<<16)|(PAL[0][1]<<8)|PAL[0][0])>>>0;
+    const p1=(0xFF000000|(PAL[1][2]<<16)|(PAL[1][1]<<8)|PAL[1][0])>>>0;
+    const p2=(0xFF000000|(PAL[2][2]<<16)|(PAL[2][1]<<8)|PAL[2][0])>>>0;
+    const p3=(0xFF000000|(PAL[3][2]<<16)|(PAL[3][1]<<8)|PAL[3][0])>>>0;
+    for(let i=0,n=d32.length;i<n;i++){
+      const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
+      const lv=299*r+587*g+114*b; // integer lum * 1000 * 255, range 0-255000
+      d32[i]=lv<63750?p0:lv<127500?p1:lv<191250?p2:p3;
+    }
+    gbCtx.putImageData(img,0,0);
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.drawImage(gbBuf,0,0);
+  }catch(e){}
 }
 // Normalise a gbPop tag. Value = 0 (off) | 'full' | a scheme name | 'custom', with an optional
 // trailing '*' meaning "pixelate this pop to match the scene's block size". Legacy 1/true -> 'full'.
@@ -1596,6 +1632,8 @@ const ART_SLOTS=[
   ['mimic','Mimic (you)'],['fighter','Fighter'],['rogue','Rogue'],['wizard','Wizard'],
   ['h','Props'],
   ['sack','Sack'],['vase','Vase'],['barrel','Barrel'],['chest','Chest'],['statue','Statue'],
+  ['h','Torches & Beacons'],
+  ['torch','Torch'],['beacon','Beacon'],
   ['h','Treasure & Portal'],
   ['gold','Gold pile'],['gem','Gem'],['artifact','Artifact'],['portal','Portal'],
 ];
@@ -1801,11 +1839,14 @@ function nextCustomId(){
   return ids.length?Math.max(...ids)+1:12;
 }
 function addCustomTile(kind){
+  const defaultName=kind==='wall'?'Custom Wall':'Custom Floor';
+  const name=prompt('Name this tile:',defaultName);
+  if(name===null) return;
   pushUndo();
   const id=nextCustomId();
   level.customTiles=level.customTiles||[];
-  level.customTiles.push({id,kind,name:(kind==='wall'?'Custom Wall':'Custom Floor'),color:(kind==='wall'?'#5a4070':'#3d6550')});
-  syncCustomTiles(); buildTileCache(); buildPalette();
+  level.customTiles.push({id,kind,name:(name.trim().slice(0,40)||defaultName),color:(kind==='wall'?'#5a4070':'#3d6550')});
+  syncCustomTiles(); buildTileCache(); buildPalette(); refreshArtPanel();
   setTool('ct:'+id);
 }
 function deleteCustomTile(id){
@@ -2478,6 +2519,7 @@ function gbSyncCustom(){
 document.getElementById('edGBScheme').onchange=e=>{ pushUndo(); const sel=document.getElementById('edGBScheme'); const v=(e&&e.target&&e.target.value)||sel.value; level.gb.scheme=(['dmg','grey','dusk','amber','ice','native','custom'].includes(v)?v:'dmg'); if(v!=='custom'&&sel.dataset)sel.dataset.prev=v; gbSyncCustom(); };
 for(let i=0;i<4;i++){ const el=document.getElementById('edGBc'+i); if(el)el.oninput=()=>{ if(!Array.isArray(level.gb.colors)||level.gb.colors.length!==4)level.gb.colors=[[0,0,0],[0,0,0],[0,0,0],[0,0,0]]; level.gb.colors[i]=GB_RGB(el.value); }; }
 document.getElementById('edGBPx').oninput=e=>{ level.gb.px=clamp(Math.round(+e.target.value||5),1,12); };
+document.getElementById('edGBPixelate').onchange=e=>{ level.gb.pixelate=e.target.checked; };
 document.getElementById('edGBPlayer').onchange=e=>{ pushUndo(); const v=e.target.value; const wasPx=String(level.gb.player||'').endsWith('*'); level.gb.player=(v==='0'?0:(wasPx?v+'*':v)); };
 document.getElementById('edGBPlayerPx').onchange=e=>{ pushUndo(); const k=String(level.gb.player||'').replace('*',''); if(k&&k!=='0')level.gb.player=e.target.checked?k+'*':k; };
 document.getElementById('btnTemplate').onclick=()=>{
@@ -2539,7 +2581,7 @@ document.getElementById('fileImport').onchange=e=>{
         const _ids=new Set(level.enemyDefs.map(e=>e.id));
         for(const h of level.heroes) if(h.def&&!_ids.has(h.def)) delete h.def;
         level.endn=Math.max(0,+level.endn||0);
-        level.gb={ on:!!(level.gb&&level.gb.on), scheme:(level.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(level.gb.scheme))?level.gb.scheme:'dmg', px:clamp(Math.round((level.gb&&+level.gb.px)||5),1,12), colors:(level.gb&&Array.isArray(level.gb.colors)&&level.gb.colors.length===4)?level.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(level.gb&&level.gb.player) }; } 
+        level.gb={ on:!!(level.gb&&level.gb.on), scheme:(level.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(level.gb.scheme))?level.gb.scheme:'dmg', px:clamp(Math.round((level.gb&&+level.gb.px)||5),1,12), colors:(level.gb&&Array.isArray(level.gb.colors)&&level.gb.colors.length===4)?level.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(level.gb&&level.gb.player), pixelate:(level.gb&&level.gb.pixelate!==false) }; } 
         for(const to of (level.torches||[])){
           if(to.radius!=null)to.radius=clamp(+to.radius||190,40,600);
           if(to.color&&!(Array.isArray(to.color)&&to.color.length===3))delete to.color;
@@ -2606,10 +2648,11 @@ function syncBarFromLevel(){
   document.getElementById('lvRows').value=level.rows;
   document.getElementById('lvAmbient').value=Math.round((level.ambient==null?0.5:level.ambient)*100);
   document.getElementById('lvMode').value=(level.mode==='plunder')?'plunder':'heist';
-  if(!level.gb)level.gb={on:false,scheme:'dmg',px:5};
+  if(!level.gb)level.gb={on:false,scheme:'dmg',px:5,pixelate:true};
   document.getElementById('edGB').textContent=level.gb.on?'On':'Off';
   document.getElementById('edGBScheme').value=level.gb.scheme||'dmg';
   document.getElementById('edGBPx').value=level.gb.px||5;
+  document.getElementById('edGBPixelate').checked=(level.gb.pixelate!==false);
   document.getElementById('edGBPlayer').value=((level.gb.player===1||level.gb.player===true)?'full':String(level.gb.player||'0')).replace('*','');
   document.getElementById('edGBPlayerPx').checked=String(level.gb.player||'').endsWith('*');
   gbSyncCustom();
@@ -2658,7 +2701,7 @@ function startPlay(fromEditor){
     player:{x:level.spawn.x,y:level.spawn.y,form:'chest',sneak:false,face:0,moving:false,
             eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
     portal:{x:level.portal.x,y:level.portal.y,r:34,active:false,spin:0},
-    runTime:0, detections:0, chaos:0, goalValue:0, decoyId:0, mode:level.mode||'heist', invaderLoot:0, gb:level.gb||{on:false,scheme:'dmg',px:5},
+    runTime:0, detections:0, chaos:0, goalValue:0, decoyId:0, mode:level.mode||'heist', invaderLoot:0, gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
     goal:Math.min(level.goal,Math.max(total,1)), showMap:true, over:false,
     torches:level.torches.map(to=>({...to,on:!!(to.start==null?1:to.start)})),
     inter:level.inter.map(it=>({...it,active:false,flip:false,open:!!it.init,on:!!it.init,prevOpen:null,prevOn:null,picked:false,show:(it.kind==='hint'&&it.mode==='label')?1:0})),
@@ -3111,22 +3154,12 @@ function renderPlay(t){
       break;
     }
   }
+  if(G.player&&!G.over){const _pa=G.player,_pulse=0.15+Math.sin(t*2)*0.05;const _ag=ctx.createRadialGradient(_pa.x,_pa.y+10,0,_pa.x,_pa.y+10,34);_ag.addColorStop(0,'rgba(190,160,255,'+_pulse+')');_ag.addColorStop(1,'rgba(190,160,255,0)');ctx.save();ctx.fillStyle=_ag;ctx.beginPath();ctx.ellipse(_pa.x,_pa.y+10,34,20,0,0,TAU);ctx.fill();ctx.restore();}
   drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid});
   for(const to of curTorches())drawTorchAt(to,t);
-  if(G.gb&&G.gb.on){ applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
+  if(G.gb&&G.gb.on){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors); else applyColorClamp(G.gb.scheme,G.gb.colors); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
   applyLighting(t);
   if(G.gb&&G.gb.on) drawGbPops(t,false);
-  if(G.player&&!G.over){
-    const p=G.player, _rm=reduceMotion(), rr=(p.r||16)+7, mv=_rm?0:Math.sin(t*4)*1.4;
-    ctx.save();
-    ctx.beginPath();ctx.arc(p.x,p.y,rr+mv,0,TAU);
-    ctx.lineWidth=4;ctx.strokeStyle='rgba(8,6,14,0.55)';ctx.stroke();
-    ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,0.92)';ctx.stroke();
-    const my=p.y-rr-9-(_rm?0:Math.abs(Math.sin(t*4))*2);
-    ctx.fillStyle='rgba(8,6,14,0.5)';ctx.beginPath();ctx.moveTo(p.x-6,my-1);ctx.lineTo(p.x+6,my-1);ctx.lineTo(p.x,my+7);ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.95)';ctx.beginPath();ctx.moveTo(p.x-5,my);ctx.lineTo(p.x+5,my);ctx.lineTo(p.x,my+6);ctx.closePath();ctx.fill();
-    ctx.restore();
-  }
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
       const w=30,bx=P.x-w/2,by=P.y+P.r+8,fr=P.integrity/100;
@@ -3299,10 +3332,10 @@ function renderEditor(t){
     ctx.strokeStyle='#ffe082';ctx.lineWidth=3/ed.zoom;
     ctx.beginPath();ctx.arc(ed.sel.ref.x,ed.sel.ref.y,22,0,TAU);ctx.stroke();
   }
-  ctx.save();ctx.translate(level.spawn.x,level.spawn.y);
-  vecMimic(t,null);
+  drawPropAt('mimic',level.spawn.x,level.spawn.y,t,false,null);
+  ctx.save();
   ctx.fillStyle='#c8b6e8';ctx.font='bold 11px Nunito';ctx.textAlign='center';
-  ctx.fillText('SPAWN',0,30);
+  ctx.fillText('SPAWN',level.spawn.x,level.spawn.y+30);
   ctx.restore();
   if(ed.sel&&ed.sel.type==='spawn'){
     ctx.strokeStyle='#ffe082';ctx.lineWidth=3/ed.zoom;
@@ -3393,7 +3426,7 @@ function tryRestoreDraft(){
         const _ids=new Set(level.enemyDefs.map(e=>e.id));
         for(const h of level.heroes) if(h.def&&!_ids.has(h.def)) delete h.def;
         level.endn=Math.max(0,+level.endn||0);
-        level.gb={ on:!!(level.gb&&level.gb.on), scheme:(level.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(level.gb.scheme))?level.gb.scheme:'dmg', px:clamp(Math.round((level.gb&&+level.gb.px)||5),1,12), colors:(level.gb&&Array.isArray(level.gb.colors)&&level.gb.colors.length===4)?level.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(level.gb&&level.gb.player) }; } 
+        level.gb={ on:!!(level.gb&&level.gb.on), scheme:(level.gb&&['dmg','grey','dusk','amber','ice','native','custom'].includes(level.gb.scheme))?level.gb.scheme:'dmg', px:clamp(Math.round((level.gb&&+level.gb.px)||5),1,12), colors:(level.gb&&Array.isArray(level.gb.colors)&&level.gb.colors.length===4)?level.gb.colors.map(c=>(Array.isArray(c)?c.slice(0,3).map(v=>clamp(Math.round(+v||0),0,255)):[0,0,0])):undefined, player:gbPopVal(level.gb&&level.gb.player), pixelate:(level.gb&&level.gb.pixelate!==false) }; } 
         for(const to of (level.torches||[])){
           if(to.radius!=null)to.radius=clamp(+to.radius||190,40,600);
           if(to.color&&!(Array.isArray(to.color)&&to.color.length===3))delete to.color;

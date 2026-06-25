@@ -664,8 +664,18 @@ function torchLit(to){ return (to&&to.on!=null)?!!to.on:((!to||to.start==null)?t
 function drawTorchAt(p,t){
   const fl=Math.sin(t*9+p.x)*2;
   const _c=(p.color&&p.color.length===3)?p.color:[255,176,92], _rgb=_c[0]+','+_c[1]+','+_c[2];
+  const _aim=(p.aid&&assetImgs[p.aid])||(p.glow?artImgs['beacon']:artImgs['torch'])||null;
+  function _spr(alpha){
+    if(!_aim)return false;
+    const fw=_aim.frameW||_aim.width;
+    const sx=stripSX(_aim,p.x*0.05+p.y*0.05,performance.now()/1000);
+    const s=40/Math.max(fw,_aim.height);
+    ctx.save();if(alpha!=null)ctx.globalAlpha=alpha;
+    ctx.drawImage(_aim,sx,0,fw,_aim.height,p.x-fw*s/2,p.y-_aim.height*s/2,fw*s,_aim.height*s);
+    ctx.restore();return true;
+  }
   if(!torchLit(p)){
-    if(p.aid&&assetImgs[p.aid]){ ctx.save();ctx.globalAlpha=0.3;drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);ctx.restore();return; }
+    if(_spr(0.3))return;
     if(p.glow){ ctx.strokeStyle='rgba('+_rgb+',0.3)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,6,0,TAU);ctx.stroke();return; }
     ctx.fillStyle='#4a3420';ctx.fillRect(p.x-3,p.y-2,6,14);
     ctx.fillStyle='rgba(110,84,58,0.7)';ctx.beginPath();ctx.ellipse(p.x,p.y-6,4,6,0,0,TAU);ctx.fill();
@@ -676,7 +686,7 @@ function drawTorchAt(p,t){
     const gb=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,R+12);
     gb.addColorStop(0,'rgba('+_rgb+',0.95)');gb.addColorStop(0.5,'rgba('+_rgb+',0.5)');gb.addColorStop(1,'rgba('+_rgb+',0)');
     ctx.fillStyle=gb;ctx.beginPath();ctx.arc(p.x,p.y,R+12,0,TAU);ctx.fill();
-    if(p.aid&&assetImgs[p.aid]){drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);return;}
+    if(_spr())return;
     ctx.fillStyle='rgb('+_rgb+')';ctx.beginPath();ctx.arc(p.x,p.y,7*br,0,TAU);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,0.85)';ctx.beginPath();ctx.arc(p.x,p.y,3,0,TAU);ctx.fill();
     return;
@@ -686,7 +696,7 @@ function drawTorchAt(p,t){
   const g=ctx.createRadialGradient(p.x,p.y,4,p.x,p.y,gr+fl*4);
   g.addColorStop(0,'rgba('+_rgb+','+(amb>0?0.5:0.30)+')');g.addColorStop(1,'rgba('+_rgb+',0)');
   ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,gr+fl*4,0,TAU);ctx.fill();
-  if(p.aid&&assetImgs[p.aid]){drawSprite(null,p.x,p.y,40,null,p.x*0.05+p.y*0.05,null,p);return;}
+  if(_spr())return;
   ctx.fillStyle='#6b4a2c';ctx.fillRect(p.x-3,p.y-2,6,14);
   ctx.fillStyle='rgb('+_rgb+')';ctx.beginPath();ctx.ellipse(p.x,p.y-6+fl*0.5,5,9+fl,0,0,TAU);ctx.fill();
   ctx.fillStyle='rgba(255,255,236,0.92)';ctx.beginPath();ctx.ellipse(p.x,p.y-5,2.5,5,0,0,TAU);ctx.fill();
@@ -800,6 +810,31 @@ function applyGameBoy(px,scheme,colors){
     ctx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);   // integer upscale = crisp uniform pixels
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
+}
+function applyColorClamp(scheme,colors){
+  try{
+    if(scheme==='native')return;
+    const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
+    if(!gbCtx||!gbCtx.getImageData)return;
+    if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
+    gbCtx.drawImage(cv,0,0);
+    const img=gbCtx.getImageData(0,0,vw,vh);
+    const d32=new Uint32Array(img.data.buffer);
+    // Pre-pack palette as little-endian ABGR (matches canvas Uint32 layout: R|G<<8|B<<16|A<<24)
+    const p0=(0xFF000000|(PAL[0][2]<<16)|(PAL[0][1]<<8)|PAL[0][0])>>>0;
+    const p1=(0xFF000000|(PAL[1][2]<<16)|(PAL[1][1]<<8)|PAL[1][0])>>>0;
+    const p2=(0xFF000000|(PAL[2][2]<<16)|(PAL[2][1]<<8)|PAL[2][0])>>>0;
+    const p3=(0xFF000000|(PAL[3][2]<<16)|(PAL[3][1]<<8)|PAL[3][0])>>>0;
+    for(let i=0,n=d32.length;i<n;i++){
+      const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
+      const lv=299*r+587*g+114*b; // integer lum * 1000 * 255, range 0-255000
+      d32[i]=lv<63750?p0:lv<127500?p1:lv<191250?p2:p3;
+    }
+    gbCtx.putImageData(img,0,0);
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.drawImage(gbBuf,0,0);
+  }catch(e){}
 }
 // Normalise a gbPop tag. Value = 0 (off) | 'full' | a scheme name | 'custom', with an optional
 // trailing '*' meaning "pixelate this pop to match the scene's block size". Legacy 1/true -> 'full'.
