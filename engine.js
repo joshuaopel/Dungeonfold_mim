@@ -304,6 +304,21 @@ function drawInter(it,st){
   }
   ctx.restore();
 }
+function drawKeyItem(k,t){
+  const bob=Math.sin((t||0)*2+(k.bob||0))*3;
+  ctx.save();ctx.translate(k.x,k.y+bob);
+  const grd=ctx.createRadialGradient(0,0,2,0,0,18);
+  grd.addColorStop(0,'rgba(255,220,60,0.4)');grd.addColorStop(1,'rgba(255,220,60,0)');
+  ctx.fillStyle=grd;ctx.beginPath();ctx.arc(0,0,18,0,TAU);ctx.fill();
+  ctx.strokeStyle='#8a6020';ctx.lineWidth=2;ctx.fillStyle='#e8c44a';
+  ctx.beginPath();ctx.arc(-4,0,6,0,TAU);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8c44a';ctx.beginPath();
+  ctx.roundRect?ctx.roundRect(0,-2.5,13,5,2):rrect(0,-2.5,13,5,2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8c44a';ctx.strokeStyle='#8a6020';
+  ctx.fillRect(6,2,3,5);ctx.strokeRect(6,2,3,5);
+  ctx.fillRect(10,2,3,4);ctx.strokeRect(10,2,3,4);
+  ctx.restore();
+}
 function rrectS(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.stroke();}
 /* ---------- hint signs: authorable in-world tutorial text ---------- */
 function wrapHint(s,max){
@@ -380,6 +395,13 @@ function updateInter(dt){
       it.active=!!it.flip;
     }
     if(it.active)for(const l of G.links)if(l[0]===it.id)act[l[1]]=true;
+  }
+  if(G.keys)for(const k of G.keys){
+    if(!k.taken&&dist(G.player,k)<36){
+      k.taken=true;sfx('coin');poof(k.x,k.y,PAL.gold,8);
+      say(G.player,pick(['A key!','Got a key!','Useful…']));
+    }
+    if(k.taken)for(const l of G.links)if(l[0]===k.id)act[l[1]]=true;
   }
   if(G.torches)for(const to of G.torches){ const st=(to.start==null?1:to.start); to.on=(!!st)!==(!!act[to.id]); }
   doorBlock={};
