@@ -917,16 +917,15 @@ function applyColorClamp(scheme,colors){
     if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
     gbCtx.drawImage(cv,0,0);
     const img=gbCtx.getImageData(0,0,vw,vh);
-    const d32=new Uint32Array(img.data.buffer);
+    const n=PAL.length;
     // Pre-pack palette as little-endian ABGR (matches canvas Uint32 layout: R|G<<8|B<<16|A<<24)
-    const p0=(0xFF000000|(PAL[0][2]<<16)|(PAL[0][1]<<8)|PAL[0][0])>>>0;
-    const p1=(0xFF000000|(PAL[1][2]<<16)|(PAL[1][1]<<8)|PAL[1][0])>>>0;
-    const p2=(0xFF000000|(PAL[2][2]<<16)|(PAL[2][1]<<8)|PAL[2][0])>>>0;
-    const p3=(0xFF000000|(PAL[3][2]<<16)|(PAL[3][1]<<8)|PAL[3][0])>>>0;
-    for(let i=0,n=d32.length;i<n;i++){
+    const packed=new Uint32Array(n);
+    for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
+    const d32=new Uint32Array(img.data.buffer);
+    for(let i=0,len=d32.length;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      const lv=299*r+587*g+114*b; // integer lum * 1000 * 255, range 0-255000
-      d32[i]=lv<63750?p0:lv<127500?p1:lv<191250?p2:p3;
+      const lum=(299*r+587*g+114*b)/255000;
+      d32[i]=packed[gbLevel(lum,n)];
     }
     gbCtx.putImageData(img,0,0);
     ctx.setTransform(1,0,0,1,0,0);
