@@ -200,7 +200,7 @@ input[type=color]{padding:0}
   <div class="sep"></div>
   <label style="font-size:11px">Goal <input type="number" id="lvGoal" value="15" min="1"></label>
   <label style="font-size:11px" title="Darkness of unlit areas. Torches and the Mimic light up their surroundings. 0 = lighting off. See it in Playtest.">Dark <input type="range" id="lvAmbient" min="0" max="90" value="50" style="width:66px;vertical-align:middle"></label>
-  <label style="font-size:11px" title="Heist = sneak past invaders to your treasure. Plunder = race the invaders; they actively loot and cart gold to their entrance. Scare a carrier (Chest Snap / spike trap) to make them drop it.">Mode <select id="lvMode"><option value="heist">Heist</option><option value="plunder">Plunder</option></select></label>
+  <label style="font-size:11px" title="Heist = sneak past invaders to your treasure. Plunder = race the invaders; they actively loot and cart gold to their entrance. Scare a carrier (Chest Snap / spike trap) to make them drop it. Ghost = reach the exit without ever being detected — the portal is open from the start and a single detection fails the run (gold is optional bonus).">Mode <select id="lvMode"><option value="heist">Heist</option><option value="plunder">Plunder</option><option value="ghost">Ghost</option></select></label>
   <span style="border-left:1px solid #3b2f58;padding-left:8px;margin-left:2px"></span>
   <label style="font-size:11px" title="Preview the Game Boy retro filter while editing. Affects the scene only — grid, waypoint numbers, labels and the instruction bar stay crisp.">GB <button id="edGB" title="Toggle Game Boy preview">Off</button></label> <label style="font-size:11px" title="Preview level lighting (ambient + torches) while editing so custom art tones match the game. Grid, labels and selection stay crisp.">Light <button id="edLight" title="Toggle lighting preview">On</button></label>
   <label style="font-size:11px" title="Game Boy palette">Pal <select id="edGBScheme"><option value="dmg">DMG Green</option><option value="grey">Pocket Grey</option><option value="dusk">Dusk Purple</option><option value="amber">Amber CRT</option><option value="ice">Ice Blue</option><option value="native">Native (no recolor)</option><option value="custom">Custom…</option></select></label>
@@ -879,6 +879,7 @@ function checkRace(){
 }
 function loseRace(){ if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
 function lose(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
+function loseSeen(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,{name:h.name,seen:true});}
 function cdBar(id,frac){
   const el=document.getElementById(id);
   el.querySelector('.cd').style.height=(frac*100)+'%';
@@ -886,6 +887,14 @@ function cdBar(id,frac){
 }
 const fmtTime=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function updateGoalHUD(){
+  const gl=document.getElementById('goalLabel');
+  if(G&&G.mode==='ghost'){
+    if(gl)gl.textContent='Escape Unseen';
+    document.getElementById('goalValue').textContent='Stay unseen ✦'+(G.goalValue?'   +'+G.goalValue+' gold':'');
+    document.getElementById('goalBar').style.width='100%';
+    return;
+  }
+  if(gl)gl.textContent='Treasure Recovered';
   const extra=(G&&G.mode==='plunder')?'   invaders '+G.invaderLoot:'';
   document.getElementById('goalValue').textContent=Math.min(G.goalValue,G.goal)+' / '+G.goal+(G.portal.active?'  ✦':'')+extra;
   document.getElementById('goalBar').style.width=clamp(G.goalValue/G.goal*100,0,100)+'%';
@@ -2545,7 +2554,7 @@ document.getElementById('btnClear').onclick=()=>{
   syncBarFromLevel();
 };
 document.getElementById('lvAmbient').oninput=e=>{ level.ambient=clamp((+e.target.value||0)/100,0,0.92); };
-document.getElementById('lvMode').onchange=e=>{ pushUndo(); level.mode=(e.target.value==='plunder')?'plunder':'heist'; };
+document.getElementById('lvMode').onchange=e=>{ pushUndo(); level.mode=(['plunder','ghost'].includes(e.target.value))?e.target.value:'heist'; };
 document.getElementById('edGB').onclick=()=>{ pushUndo(); level.gb.on=!level.gb.on; document.getElementById('edGB').textContent=level.gb.on?'On':'Off'; };
 document.getElementById('edLight').onclick=()=>{ ed.lightPreview=!ed.lightPreview; document.getElementById('edLight').textContent=ed.lightPreview?'On':'Off'; };
 const GB_HEX=v=>'#'+[0,1,2].map(i=>('0'+(v[i]||0).toString(16)).slice(-2)).join('');
@@ -2643,7 +2652,7 @@ document.getElementById('fileImport').onchange=e=>{
       {const ids=new Set(level.objDefs.map(d=>d.id));
        level.objects=(Array.isArray(level.objects)?level.objects:[]).filter(o=>o&&ids.has(o.d)).map(o=>({d:o.d,x:+o.x||0,y:+o.y||0,r:+o.r||0,f:o.f?1:0}));}
       level.odn=Math.max(0,+level.odn||0);
-      level.mode=(level.mode==='plunder')?'plunder':'heist';
+      level.mode=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
       { const ABILS=['lockpick','keensight','sprinter','fearless','alarm'];
         level.enemyDefs=(Array.isArray(level.enemyDefs)?level.enemyDefs:[]).map((e,i)=>({
           id:String((e&&e.id)||('e'+i)), name:String((e&&e.name)||'Enemy').slice(0,40),
@@ -2722,7 +2731,7 @@ function syncBarFromLevel(){
   document.getElementById('lvCols').value=level.cols;
   document.getElementById('lvRows').value=level.rows;
   document.getElementById('lvAmbient').value=Math.round((level.ambient==null?0.5:level.ambient)*100);
-  document.getElementById('lvMode').value=(level.mode==='plunder')?'plunder':'heist';
+  document.getElementById('lvMode').value=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
   if(!level.gb)level.gb={on:false,scheme:'dmg',px:5,pixelate:true};
   document.getElementById('edGB').textContent=level.gb.on?'On':'Off';
   document.getElementById('edGBScheme').value=level.gb.scheme||'dmg';
@@ -2775,7 +2784,7 @@ function startPlay(fromEditor){
     decoys:[], particles:[], bubbles:[], pulses:[],
     player:{x:level.spawn.x,y:level.spawn.y,form:'chest',sneak:false,face:0,moving:false,
             eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
-    portal:{x:level.portal.x,y:level.portal.y,r:34,active:false,spin:0},
+    portal:{x:level.portal.x,y:level.portal.y,r:34,active:(level.mode==='ghost'),spin:0},
     runTime:0, detections:0, chaos:0, goalValue:0, decoyId:0, mode:level.mode||'heist', invaderLoot:0, gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
     goal:Math.min(level.goal,Math.max(total,1)), showMap:true, over:false,
     torches:level.torches.map(to=>({...to,on:!!(to.start==null?1:to.start)})),
@@ -3004,6 +3013,7 @@ function updateHero(h,dt){
   if(h.suspicion>=80&&h.state!=='chase'){
     h.state='chase'; clearNav(h);
     G.detections++; sfx('alert'); say(h,pick(LINES.chase)); addShake(9);addHitStop(0.05);addFlash('255,70,70',0.55);
+    if(G.mode==='ghost'){loseSeen(h);return;}   // ghost run: a single detection ends it
     if(hasAbil(h,'alarm'))for(const o of G.heroes)if(o!==h&&o.state!=='chase'&&o.state!=='scared'&&dist(o,h)<320){o.suspicion=Math.min(100,o.suspicion+50);o.lastSeen={x:p.x,y:p.y};}
   } else if(h.suspicion>=45&&h.state==='patrol'){
     h.state='investigate'; clearNav(h);
@@ -3129,8 +3139,11 @@ function showEnd(won,h){
   const detectPen=G.detections*200;
   const total=Math.max(0,won?treasurePts+timeBonus+chaosBonus-detectPen:Math.floor(treasurePts*0.25));
   let rank='F';
-  if(won){rank='C';if(total>=1400)rank='B';if(total>=2200)rank='A';if(total>=2800&&G.detections===0)rank='S';}
-  document.getElementById('endTitle').textContent=won?'Treasure Reclaimed!':((h&&h.name==='__race__')?'The invaders looted the hoard!':'Caught by the '+h.name+'!');
+  if(won){
+    if(G.mode==='ghost'){rank='A';if(total>=2000||G.runTime<=150)rank='S';}   // an unseen escape is elite by definition
+    else {rank='C';if(total>=1400)rank='B';if(total>=2200)rank='A';if(total>=2800&&G.detections===0)rank='S';}
+  }
+  document.getElementById('endTitle').textContent=won?(G.mode==='ghost'?'Escaped Unseen!':'Treasure Reclaimed!'):((h&&h.name==='__race__')?'The invaders looted the hoard!':(h&&h.seen)?'The '+h.name+' spotted you!':'Caught by the '+h.name+'!');
   document.getElementById('rank').textContent=rank;
   document.getElementById('endStats').innerHTML=
     '<span>Treasure</span><span>'+G.goalValue+' gold · '+treasurePts+'</span>'+
@@ -3490,7 +3503,7 @@ function tryRestoreDraft(){
       {const ids=new Set(level.objDefs.map(d=>d.id));
        level.objects=(Array.isArray(level.objects)?level.objects:[]).filter(o=>o&&ids.has(o.d)).map(o=>({d:o.d,x:+o.x||0,y:+o.y||0,r:+o.r||0,f:o.f?1:0}));}
       level.odn=Math.max(0,+level.odn||0);
-      level.mode=(level.mode==='plunder')?'plunder':'heist';
+      level.mode=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
       { const ABILS=['lockpick','keensight','sprinter','fearless','alarm'];
         level.enemyDefs=(Array.isArray(level.enemyDefs)?level.enemyDefs:[]).map((e,i)=>({
           id:String((e&&e.id)||('e'+i)), name:String((e&&e.name)||'Enemy').slice(0,40),

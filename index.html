@@ -884,6 +884,7 @@ function checkRace(){
 }
 function loseRace(){ if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
 function lose(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
+function loseSeen(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,{name:h.name,seen:true});}
 function cdBar(id,frac){
   const el=document.getElementById(id);
   el.querySelector('.cd').style.height=(frac*100)+'%';
@@ -891,6 +892,14 @@ function cdBar(id,frac){
 }
 const fmtTime=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function updateGoalHUD(){
+  const gl=document.getElementById('goalLabel');
+  if(G&&G.mode==='ghost'){
+    if(gl)gl.textContent=t('goal_ghost');
+    document.getElementById('goalValue').textContent='Stay unseen ✦'+(G.goalValue?'   +'+G.goalValue+' '+t('meta_gold'):'');
+    document.getElementById('goalBar').style.width='100%';
+    return;
+  }
+  if(gl)gl.textContent=t('goal_label');
   const extra=(G&&G.mode==='plunder')?'   invaders '+G.invaderLoot:'';
   document.getElementById('goalValue').textContent=Math.min(G.goalValue,G.goal)+' / '+G.goal+(G.portal.active?'  ✦':'')+extra;
   document.getElementById('goalBar').style.width=clamp(G.goalValue/G.goal*100,0,100)+'%';
@@ -1360,8 +1369,8 @@ const L10N={
     paused:'Paused', set_title:'Settings', set_reduce:'Reduce motion (screen shake, hit-stop)',
     set_contrast:'High-contrast suspicion cues', set_gb:'Game Boy mode (4-color retro)', set_gb_scheme:'Game Boy palette', set_gb_px:'Game Boy pixel size', set_keyboard:'Keyboard', set_language:'Language',
     btn_reset_keys:'Reset keys', btn_done:'Done',
-    ab_decoy:'Fake Loot', ab_snap:'Chest Snap', goal_label:'Treasure Recovered',
-    end_win:'Treasure Reclaimed!', end_lose:'Caught by the {0}!', end_lose_race:'The invaders looted the hoard!',
+    ab_decoy:'Fake Loot', ab_snap:'Chest Snap', goal_label:'Treasure Recovered', goal_ghost:'Escape Unseen',
+    end_win:'Treasure Reclaimed!', end_win_ghost:'Escaped Unseen!', end_lose:'Caught by the {0}!', end_lose_seen:'The {0} spotted you!', end_lose_race:'The invaders looted the hoard!',
     end_dungeon:'Dungeon', end_treasure:'Treasure', end_time:'Time', end_detections:'Detections', end_clean:'clean!',
     meta_heroes:'heroes', meta_goal:'goal', meta_gold:'gold', meta_by:'by',
     hint_kb:'<b>WASD</b> move \u00b7 <b>Shift</b> sneak \u00b7 <b>E</b> morph \u00b7 <b>Space</b> grab \u00b7 <b>Q</b> decoy \u00b7 <b>R</b> snap \u00b7 <b>Esc</b> pause',
@@ -1382,8 +1391,8 @@ const L10N={
     paused:'En pausa', set_title:'Ajustes', set_reduce:'Reducir movimiento (sacudidas, pausas de impacto)',
     set_contrast:'Indicadores de sospecha de alto contraste', set_gb:'Modo Game Boy (4 colores)', set_gb_scheme:'Paleta Game Boy', set_gb_px:'Tama\u00f1o de p\u00edxel Game Boy', set_keyboard:'Teclado', set_language:'Idioma',
     btn_reset_keys:'Restablecer teclas', btn_done:'Listo',
-    ab_decoy:'Cebo', ab_snap:'Mordisco', goal_label:'Tesoro Recuperado',
-    end_win:'\u00a1Tesoro Recuperado!', end_lose:'\u00a1Atrapado por el {0}!', end_lose_race:'\u00a1Los invasores saquearon el bot\u00edn!',
+    ab_decoy:'Cebo', ab_snap:'Mordisco', goal_label:'Tesoro Recuperado', goal_ghost:'Escapa Sin Ser Visto',
+    end_win:'\u00a1Tesoro Recuperado!', end_win_ghost:'\u00a1Escapaste Sin Ser Visto!', end_lose:'\u00a1Atrapado por el {0}!', end_lose_seen:'\u00a1El {0} te vio!', end_lose_race:'\u00a1Los invasores saquearon el bot\u00edn!',
     end_dungeon:'Mazmorra', end_treasure:'Tesoro', end_time:'Tiempo', end_detections:'Detecciones', end_clean:'\u00a1limpio!',
     meta_heroes:'h\u00e9roes', meta_goal:'meta', meta_gold:'oro', meta_by:'por',
     lines_sus:['\u00bfSe movi\u00f3 ese barril?','Algo no va bien\u2026','\u00bfEso estaba ah\u00ed antes?'],
@@ -1614,7 +1623,7 @@ function sanitizeLevel(raw){
   const lv=blankLevel(raw.cols,raw.rows);
   lv.name=String(raw.name||'Custom Dungeon').slice(0,48);
   lv.goal=Math.max(1,+raw.goal||15);
-  lv.mode=(raw.mode==='plunder')?'plunder':'heist';
+  lv.mode=(['plunder','ghost'].includes(raw.mode))?raw.mode:'heist';
   lv.enemyDefs=[];
   { const ABILS=['lockpick','keensight','sprinter','fearless','alarm'];
     for(const e of (raw.enemyDefs||[])){ if(!e)continue;
@@ -2277,7 +2286,7 @@ function startPlay(){
     decoys:[],particles:[],bubbles:[],pulses:[],
     player:{x:level.spawn.x,y:level.spawn.y,form:'chest',sneak:false,face:0,moving:false,
             eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
-    portal:{x:level.portal.x,y:level.portal.y,r:34,active:false,spin:0},
+    portal:{x:level.portal.x,y:level.portal.y,r:34,active:(level.mode==='ghost'),spin:0},
     runTime:0,detections:0,chaos:0,goalValue:0,decoyId:0,mode:level.mode||'heist',invaderLoot:0,gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
     goal:Math.min(level.goal,Math.max(total,1)),showMap:true,over:false,paused:false,
     torches:level.torches.map(to=>({...to,on:!!(to.start==null?1:to.start)})),
@@ -2494,6 +2503,7 @@ function updateHero(h,dt){
   if(h.suspicion>=80&&h.state!=='chase'){
     h.state='chase';clearNav(h);
     G.detections++;sfx('alert');say(h,pick(LINES.chase));addShake(9);addHitStop(0.05);addFlash('255,70,70',0.55);
+    if(G.mode==='ghost'){loseSeen(h);return;}   // ghost run: a single detection ends it
     if(hasAbil(h,'alarm'))for(const o of G.heroes)if(o!==h&&o.state!=='chase'&&o.state!=='scared'&&dist(o,h)<320){o.suspicion=Math.min(100,o.suspicion+50);o.lastSeen={x:p.x,y:p.y};}
   } else if(h.suspicion>=45&&h.state==='patrol'){
     h.state='investigate';clearNav(h);
@@ -2612,7 +2622,10 @@ function showEnd(won,h){
   const detectPen=G.detections*200;
   const total=Math.max(0,won?treasurePts+timeBonus+chaosBonus-detectPen:Math.floor(treasurePts*0.25));
   let rank='F';
-  if(won){rank='C';if(total>=1400)rank='B';if(total>=2200)rank='A';if(total>=2800&&G.detections===0)rank='S';}
+  if(won){
+    if(G.mode==='ghost'){rank='A';if(total>=2000||G.runTime<=150)rank='S';}   // an unseen escape is elite by definition
+    else {rank='C';if(total>=1400)rank='B';if(total>=2200)rank='A';if(total>=2800&&G.detections===0)rank='S';}
+  }
   if(won){
     const entry=roster[currentIdx];
     const order={S:4,A:3,B:2,C:1,F:0};
@@ -2622,7 +2635,7 @@ function showEnd(won,h){
     persistSave();
     if(currentIdx+1<roster.length)roster[currentIdx+1].locked=false;
   }
-  document.getElementById('endTitle').textContent=won?t('end_win'):((h&&h.name==='__race__')?t('end_lose_race'):t('end_lose',h.name));
+  document.getElementById('endTitle').textContent=won?(G.mode==='ghost'?t('end_win_ghost'):t('end_win')):((h&&h.name==='__race__')?t('end_lose_race'):(h&&h.seen)?t('end_lose_seen',h.name):t('end_lose',h.name));
   document.getElementById('rank').textContent=rank;
   document.getElementById('endStats').innerHTML=
     '<span>'+t('end_dungeon')+'</span><span>'+level.name+'</span>'+
