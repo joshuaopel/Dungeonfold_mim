@@ -806,6 +806,7 @@ let lightCanvas=null,lightCtx=null;
 // Build the lightmap into lightCanvas but do NOT multiply onto ctx.
 // Returns true if lighting is active (ambient>0).
 function buildLightmap(t,camX,camY,zoom){
+  _lightmapReady=false;
   const amb=(level.ambient==null?0:level.ambient);
   if(amb<=0)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
@@ -835,11 +836,12 @@ function buildLightmap(t,camX,camY,zoom){
     const br=to.glow?(1+Math.sin(t*(to.pulse||1)*3)*0.18):1;
     addLight(to.x,to.y-(to.glow?0:4),(to.radius||190)*fl*br,tc[0],tc[1],tc[2],(to.intensity==null?0.95:to.intensity)*(to.glow?br:1));
   }
-  if(typeof G!=='undefined'&&G){
+  if(typeof G!=='undefined'&&G&&(typeof MODE==='undefined'||MODE==='play')){
     if(G.player)addLight(G.player.x,G.player.y,150,150,170,225,0.55);
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
+  _lightmapReady=true;
   return true;
 }
 function applyLighting(t,camX,camY,zoom){
@@ -885,18 +887,19 @@ const GB_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 function gbLevel(lum,n){ n=n||4; const l=Math.floor(lum*n); return l<0?0:l>=n?n-1:l; }
 let gbBuf=null,gbCtx=null;
 let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
+let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
 // Combined GB palette + lightmap pass. Call buildLightmap() first when ambient>0.
-// Formula: light level sets the available palette range [0..maxStop]; texture
-// luminance picks a stop within that range. This spreads all palette colors
-// across both lit and shadowed areas instead of crushing shadows to PAL[0].
+// lightLum*(n-1) maps light level continuously to palette stop (no discrete rings).
+// (texLum-0.5)*2*lightLum adds up to ±1 stop texture variation scaled by light.
+// At lightLum=0 result is always 0 → PAL[0] (full darkness = darkest color).
 function applyGameBoyLit(px,scheme,colors,pixelate){
   try{
     const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
     const n=PAL.length;
     if(!gbBuf){gbBuf=document.createElement('canvas');gbCtx=gbBuf.getContext('2d',{willReadFrequently:true});}
     if(!gbCtx||!gbCtx.getImageData)return;
-    const hasLight=!!(lightCtx&&lightCanvas&&lightCanvas.width===vw&&lightCanvas.height===vh);
+    const hasLight=_lightmapReady&&!!(lightCtx&&lightCanvas&&lightCanvas.width===vw&&lightCanvas.height===vh);
     if(pixelate!==false){
       const P=Math.max(1,Math.min(12,Math.round(px||5)));
       const lowW=Math.max(1,Math.ceil(vw/P)),lowH=Math.max(1,Math.ceil(vh/P));
@@ -918,8 +921,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
         let c;
         if(ld){
           const lightLum=(ld[i]*0.299+ld[i+1]*0.587+ld[i+2]*0.114)/255;
-          const maxStop=Math.round(lightLum*(n-1));
-          c=PAL[Math.max(0,Math.min(maxStop,Math.round(texLum*(maxStop+1))))];
+          c=PAL[Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)))];
         }else{
           c=PAL[gbLevel(texLum,n)];
         }
@@ -946,8 +948,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
         if(ld){
           const li=i*4;
           const lightLum=(ld[li]*0.299+ld[li+1]*0.587+ld[li+2]*0.114)/255;
-          const maxStop=Math.round(lightLum*(n-1));
-          s=Math.max(0,Math.min(maxStop,Math.round(texLum*(maxStop+1))));
+          s=Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)));
         }else{
           s=gbLevel(texLum,n);
         }
