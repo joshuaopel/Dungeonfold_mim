@@ -204,7 +204,7 @@ input[type=color]{padding:0}
   <span style="border-left:1px solid #3b2f58;padding-left:8px;margin-left:2px"></span>
   <label style="font-size:11px" title="Preview the Game Boy retro filter while editing. Affects the scene only — grid, waypoint numbers, labels and the instruction bar stay crisp.">GB <button id="edGB" title="Toggle Game Boy preview">Off</button></label> <label style="font-size:11px" title="Preview level lighting (ambient + torches) while editing so custom art tones match the game. Grid, labels and selection stay crisp.">Light <button id="edLight" title="Toggle lighting preview">On</button></label>
   <label style="font-size:11px" title="Game Boy palette">Pal <select id="edGBScheme"><option value="dmg">DMG Green</option><option value="grey">Pocket Grey</option><option value="dusk">Dusk Purple</option><option value="amber">Amber CRT</option><option value="ice">Ice Blue</option><option value="native">Native (no recolor)</option><option value="custom">Custom…</option></select></label>
-  <span id="edGBCustom" style="display:none" title="Color ramp — dark → light. Click swatches to edit, ＋ to add, ✕ to remove."></span>
+  <span id="edGBCustom" style="display:none;vertical-align:top;min-width:180px" title="Custom color ramp — up to 16 stops, ordered dark to light. Click any swatch to pick a color. + adds a stop, ✕ removes it."></span>
   <label style="font-size:11px" title="Game Boy pixel size — 1 = full-resolution (color/dither only), higher = chunkier blocks.">Px <input type="range" id="edGBPx" min="1" max="12" value="5" style="width:66px;vertical-align:middle"></label>
   <label style="font-size:11px" title="When checked, the scene is downscaled to chunky blocks (classic Game Boy look). Uncheck to apply only the color palette — full art resolution, no pixelation."><input type="checkbox" id="edGBPixelate" checked style="vertical-align:middle"> Pixelate</label>
   <label style="font-size:11px" title="Make the player pop in a chosen palette so you can always find yourself — visual only, does not affect stealth">Player <select id="edGBPlayer"><option value="0">Filtered</option><option value="full">Full colour</option><option value="dmg">DMG</option><option value="grey">Pocket</option><option value="dusk">Dusk</option><option value="amber">Amber</option><option value="ice">Ice</option><option value="custom">Custom</option></select></label>
@@ -2698,39 +2698,83 @@ function gbSyncCustom(){
   if(!Array.isArray(level.gb.colors)||level.gb.colors.length<2){
     const base=GB_SCHEMES[document.getElementById('edGBScheme').dataset.prev||'dmg']||GB_SCHEMES.dmg;
     level.gb.colors=base.map(c=>c.slice());
+    // Expand preset to 8 stops by splitting the widest gaps
+    const cols=level.gb.colors;
+    while(cols.length<8){
+      let best=-1,bestD=0;
+      for(let j=0;j<cols.length-1;j++){
+        const d=[0,1,2].reduce((s,k)=>s+Math.abs(cols[j+1][k]-cols[j][k]),0);
+        if(d>bestD){bestD=d;best=j;}
+      }
+      if(best<0||bestD===0)break;
+      const a=cols[best],b=cols[best+1];
+      cols.splice(best+1,0,[Math.round((a[0]+b[0])/2),Math.round((a[1]+b[1])/2),Math.round((a[2]+b[2])/2)]);
+    }
   }
   wrap.innerHTML='';
   const colors=level.gb.colors;
+  // Row 1: gradient preview bar
+  const bar=document.createElement('canvas');
+  bar.width=Math.max(colors.length*20,160); bar.height=10;
+  bar.style.cssText='display:block;width:100%;max-width:260px;height:10px;border-radius:3px;margin-bottom:4px;border:1px solid #3b2f58';
+  const bx=bar.getContext('2d');
+  const grd=bx.createLinearGradient(0,0,bar.width,0);
+  colors.forEach((c,i)=>grd.addColorStop(i/(colors.length-1||1),'rgb('+c.join(',')+')'));
+  bx.fillStyle=grd; bx.fillRect(0,0,bar.width,10);
+  wrap.appendChild(bar);
+  // Row 2: swatches
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-bottom:3px';
   colors.forEach((col,i)=>{
+    const grp=document.createElement('span');
+    grp.style.cssText='display:inline-flex;flex-direction:column;align-items:center;gap:1px';
     const sw=document.createElement('span');
-    sw.style.cssText='display:inline-block;width:18px;height:18px;vertical-align:middle;border:1px solid #6a5590;cursor:pointer;margin-right:1px;position:relative';
+    sw.style.cssText='display:block;width:24px;height:24px;border:1px solid #6a5590;cursor:pointer;border-radius:3px;position:relative;box-sizing:border-box';
     sw.style.background=GB_HEX(col);
+    sw.title='Stop '+(i+1)+': click to change color';
     const inp=document.createElement('input');
     inp.type='color'; inp.value=GB_HEX(col);
     inp.style.cssText='position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;left:0;top:0';
-    inp.oninput=()=>{ colors[i]=GB_RGB(inp.value); sw.style.background=inp.value; };
+    inp.oninput=()=>{ colors[i]=GB_RGB(inp.value); sw.style.background=inp.value;
+      // live-update gradient bar
+      const grd2=bx.createLinearGradient(0,0,bar.width,0);
+      colors.forEach((c,j)=>grd2.addColorStop(j/(colors.length-1||1),'rgb('+c.join(',')+')'));
+      bx.fillStyle=grd2; bx.fillRect(0,0,bar.width,10);
+    };
     sw.appendChild(inp);
-    wrap.appendChild(sw);
+    grp.appendChild(sw);
     if(colors.length>2){
       const rm=document.createElement('button');
       rm.textContent='✕'; rm.className='clr';
-      rm.style.cssText='font-size:8px;padding:0 2px;margin-right:2px;opacity:0.6;vertical-align:middle';
+      rm.title='Remove stop '+(i+1);
+      rm.style.cssText='font-size:7px;padding:0 2px;opacity:0.55;line-height:1.2;width:24px;box-sizing:border-box';
       rm.onclick=()=>{ colors.splice(i,1); gbSyncCustom(); };
-      wrap.appendChild(rm);
+      grp.appendChild(rm);
     }
+    row.appendChild(grp);
   });
+  // Add button as a swatch-sized tile
   if(colors.length<16){
+    const addGrp=document.createElement('span');
+    addGrp.style.cssText='display:inline-flex;flex-direction:column;align-items:center;gap:1px';
     const add=document.createElement('button');
-    add.textContent='＋'; add.title='Add a color to the ramp';
-    add.style.cssText='font-size:11px;margin-left:2px;vertical-align:middle';
+    add.textContent='+'; add.title='Add a color stop (interpolated between last two)';
+    add.style.cssText='width:24px;height:24px;font-size:16px;line-height:1;padding:0;border-radius:3px;border:1px dashed #6a5590;background:transparent;color:#a890d0;cursor:pointer';
     add.onclick=()=>{
       const n=colors.length;
       if(n>=2){ const a=colors[n-2],b=colors[n-1]; colors.push([Math.round((a[0]+b[0])/2),Math.round((a[1]+b[1])/2),Math.round((a[2]+b[2])/2)]); }
       else { colors.push([...colors[n-1]]); }
       gbSyncCustom();
     };
-    wrap.appendChild(add);
+    addGrp.appendChild(add);
+    row.appendChild(addGrp);
   }
+  wrap.appendChild(row);
+  // Row 3: count label
+  const lbl=document.createElement('div');
+  lbl.style.cssText='font-size:9px;opacity:0.55;margin-top:1px';
+  lbl.textContent=colors.length+' stops, dark → light  (max 16)';
+  wrap.appendChild(lbl);
 }
 document.getElementById('edGBScheme').onchange=e=>{ pushUndo(); const sel=document.getElementById('edGBScheme'); const v=(e&&e.target&&e.target.value)||sel.value; level.gb.scheme=(['dmg','grey','dusk','amber','ice','native','custom'].includes(v)?v:'dmg'); if(v!=='custom'&&sel.dataset)sel.dataset.prev=v; gbSyncCustom(); };
 document.getElementById('edGBPx').oninput=e=>{ level.gb.px=clamp(Math.round(+e.target.value||5),1,12); };
