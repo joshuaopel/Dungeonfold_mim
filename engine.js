@@ -69,9 +69,9 @@ const FORMS={
 const PROP_KINDS=['sack','vase','barrel','chest','statue'];
 const OCCL={barrel:13,chest:14,statue:18};
 const HERO_DEFS={
-  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0},
-  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick']},
-  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8},
+  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0,hearing:200},
+  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick'],hearing:300},
+  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8,hearing:130},
 };
 const TREASURE_VAL={gold:1,gem:3,artifact:5};
 
@@ -231,8 +231,10 @@ const INTER_KINDS={door:1,plate:1,lever:1,trap:1,hint:1};
 const INTER_TILED={door:1,plate:1,trap:1};
 const TOOL_INTER={iDoor:'door',iPlate:'plate',iLever:'lever',iTrap:'trap',iHint:'hint'};
 let doorBlock={};
+let propBlock={};            // tiles occupied by pushable props — blocks heroes, not the player (player uses circle push)
 const tileKey=(c,r)=>c+','+r;
-const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];
+const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r]&&!propBlock[c+','+r];
+const walkTileNP=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];  // ignores pushable props (for player + the props themselves)
 const interTile=it=>({c:Math.floor(it.x/TS),r:Math.floor(it.y/TS)});
 function drawInter(it,st){
   if(it.kind==='hint'){
@@ -302,6 +304,21 @@ function drawInter(it,st){
   }
   ctx.restore();
 }
+function drawKeyItem(k,t){
+  const bob=Math.sin((t||0)*2+(k.bob||0))*3;
+  ctx.save();ctx.translate(k.x,k.y+bob);
+  const grd=ctx.createRadialGradient(0,0,2,0,0,18);
+  grd.addColorStop(0,'rgba(255,220,60,0.4)');grd.addColorStop(1,'rgba(255,220,60,0)');
+  ctx.fillStyle=grd;ctx.beginPath();ctx.arc(0,0,18,0,TAU);ctx.fill();
+  ctx.strokeStyle='#8a6020';ctx.lineWidth=2;ctx.fillStyle='#e8c44a';
+  ctx.beginPath();ctx.arc(-4,0,6,0,TAU);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8c44a';ctx.beginPath();
+  ctx.roundRect?ctx.roundRect(0,-2.5,13,5,2):rrect(0,-2.5,13,5,2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e8c44a';ctx.strokeStyle='#8a6020';
+  ctx.fillRect(6,2,3,5);ctx.strokeRect(6,2,3,5);
+  ctx.fillRect(10,2,3,4);ctx.strokeRect(10,2,3,4);
+  ctx.restore();
+}
 function rrectS(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();ctx.stroke();}
 /* ---------- hint signs: authorable in-world tutorial text ---------- */
 function wrapHint(s,max){
@@ -365,17 +382,26 @@ function drawObjInst(o){
 }
 function drawObjects(){ for(const o of (level.objects||[])) drawObjInst(o); }
 function updateInter(dt){
+  propBlock={};
+  if(G.props)for(const _pr of G.props){ if(_pr.push) propBlock[Math.floor(_pr.x/TS)+','+Math.floor(_pr.y/TS)]=1; }
   const bodies=[G.player,...G.heroes];
   const act={};
   for(const it of G.inter){
     if(it.kind==='plate'){
       const tl=interTile(it),was=it.active;
-      it.active=bodies.some(b=>Math.floor(b.x/TS)===tl.c&&Math.floor(b.y/TS)===tl.r);
+      it.active=bodies.some(b=>Math.floor(b.x/TS)===tl.c&&Math.floor(b.y/TS)===tl.r)||(!!G.props&&G.props.some(pr=>pr.push&&Math.floor(pr.x/TS)===tl.c&&Math.floor(pr.y/TS)===tl.r));
       if(it.active&&!was)sfx('click');
     } else if(it.kind==='lever'){
       it.active=!!it.flip;
     }
     if(it.active)for(const l of G.links)if(l[0]===it.id)act[l[1]]=true;
+  }
+  if(G.keys)for(const k of G.keys){
+    if(!k.taken&&dist(G.player,k)<36){
+      k.taken=true;sfx('coin');poof(k.x,k.y,PAL.gold,8);
+      say(G.player,pick(['A key!','Got a key!','Useful…']));
+    }
+    if(k.taken)for(const l of G.links)if(l[0]===k.id)act[l[1]]=true;
   }
   if(G.torches)for(const to of G.torches){ const st=(to.start==null?1:to.start); to.on=(!!st)!==(!!act[to.id]); }
   doorBlock={};
@@ -406,8 +432,55 @@ function updateInter(dt){
       }
     }
   }
+  // tile triggers — fire once per tile; re-arm when player steps to a different tile
+  if(level.triggers&&level.triggers.length){
+    const pc=Math.floor(G.player.x/TS),pr=Math.floor(G.player.y/TS),pk=pc+','+pr;
+    if(pk!==G.stepKey){
+      G.stepKey=pk;
+      for(const trig of level.triggers){
+        if(trig.c!==pc||trig.r!==pr)continue;
+        if(trig.once&&trig.fired)continue;
+        trig.fired=true;
+        if(trig.effect==='creak'){sfx('click');noiseAt(G.player.x,G.player.y,trig.vol!=null?trig.vol:0.8);}
+        else if(trig.effect==='alarm'){addFlash('255,140,0',0.5);sfx('alert');for(const h of G.heroes)if(h.state!=='scared'){h.suspicion=clamp(h.suspicion+65,0,100);h.lastSeen={x:G.player.x,y:G.player.y};}}
+        else if(trig.effect==='trap'){if(!G.over)lose({name:'Floor Trap'});}
+        else if(trig.effect==='teleport'){const tx=(trig.tc+0.5)*TS,ty=(trig.tr+0.5)*TS;G.player.x=tx;G.player.y=ty;sfx('morph');poof(tx,ty,PAL.mimicBody);}
+      }
+    }
+  }
 }
 
+/* ---- pushable props: Mim can shove a prop in a direction (puzzle plates / blockers) ---- */
+const PUSH_R=15;
+function blockOtherProps(pr){
+  for(const o of G.props){
+    if(o===pr||!o.push)continue;
+    const dx=pr.x-o.x,dy=pr.y-o.y;let d=Math.hypot(dx,dy);
+    const md=(pr.r||PUSH_R)+(o.r||PUSH_R);
+    if(d>0&&d<md){ pr.x=o.x+dx/d*md; pr.y=o.y+dy/d*md; }
+  }
+}
+function resolvePush(p){
+  if(!G||!G.props)return;
+  for(const pr of G.props){
+    if(!pr.push)continue;
+    if(pr.r==null)pr.r=PUSH_R;
+    let dx=pr.x-p.x,dy=pr.y-p.y,d=Math.hypot(dx,dy);
+    const minD=(p.r||16)+pr.r;
+    if(d>=minD)continue;
+    if(d<0.0001){ dx=Math.cos(p.face||0); dy=Math.sin(p.face||0); d=1; }   // perfectly overlapped — shove along facing
+    const nx=dx/d,ny=dy/d;
+    pr.x+=nx*(minD-d); pr.y+=ny*(minD-d);    // slide the prop out along the contact axis
+    collideTiles(pr,walkTileNP);             // keep it out of walls / doors / solid objects
+    blockOtherProps(pr);                     // don't let it overlap another pushable prop
+    const nd=Math.hypot(pr.x-p.x,pr.y-p.y);
+    if(nd<minD-0.5){                          // prop couldn't clear (wall behind it) — block the player instead
+      const cd=nd||1;
+      p.x=pr.x-(pr.x-p.x)/cd*minD;
+      p.y=pr.y-(pr.y-p.y)/cd*minD;
+    }
+  }
+}
 const DECAL_KINDS={rubble:1,bones:1,puddle:1,cobweb:1,mushrooms:1,crack:1,banner:1,chain:1,coins:1,moss:1};
 const TOOL_DECAL={dRubble:'rubble',dBones:'bones',dPuddle:'puddle',dCobweb:'cobweb',dMushroom:'mushrooms',dCrack:'crack',dBanner:'banner',dChain:'chain',dCoins:'coins',dMoss:'moss'};
 let level=null;
@@ -451,6 +524,23 @@ function tryMorph(){
 }
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function say(who,text){G.bubbles.push({who,text,t:2.4});}
+/* ---- noiseAt: emit a sound burst; nearby heroes investigate the source ---- */
+function noiseAt(x,y,vol){
+  if(!G||!G.heroes)return;
+  vol=(vol==null?1:vol);
+  for(const h of G.heroes){
+    if(h.state==='chase'||h.state==='scared')continue;
+    const d=dist(h,{x,y}),range=(h.hearing||200)*vol;
+    if(d>=range)continue;
+    const gain=30*h.perc*(1-d/range);
+    h.suspicion=clamp(h.suspicion+gain,0,100);
+    if(h.state!=='investigate'&&h.state!=='lured'){
+      h.state='investigate';clearNav(h);
+      h.poi={x,y};h.pauseT=1.8;
+      say(h,pick(['What was that?','...Hello?','I heard something!']));
+    } else if(h.state==='investigate'){h.poi={x,y};}
+  }
+}
 function moveDirect(h,target,speed,dt){
   const a=angTo(h,target);
   h.ang=lerpAngle(h.ang,a,clamp(dt*6,0,1));
@@ -626,6 +716,12 @@ function drawPropAt(kind,x,y,t,isPlayer,inst){
   ctx.save();ctx.translate(x,y);
   shadowAt(kind==='statue'?22:16);
   ctx.restore();
+  if(inst&&inst.push&&!isPlayer){          // faint dashed base ring marks a prop Mim can push
+    ctx.save();ctx.translate(x,y+15);ctx.globalAlpha=0.45;
+    ctx.strokeStyle='rgba(150,205,255,0.9)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.ellipse(0,0,19,8,0,0,TAU);ctx.stroke();
+    ctx.restore();
+  }
   let fx=null;
   if(isPlayer&&G){
     const mode=G.player.sneak?'sneak':(G.player.moving?'walk':'idle');
@@ -780,7 +876,7 @@ const GB_SCHEMES={
   ice:[[16,26,44],[50,84,126],[120,170,210],[212,240,255]]
 };
 const GB_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
-function gbLevel(lum){ let l=Math.floor(lum*4); return l<0?0:l>3?3:l; }
+function gbLevel(lum,n){ n=n||4; const l=Math.floor(lum*n); return l<0?0:l>=n?n-1:l; }
 let gbBuf=null,gbCtx=null;
 
 function applyGameBoy(px,scheme,colors){
@@ -794,13 +890,14 @@ function applyGameBoy(px,scheme,colors){
     gbCtx.clearRect(0,0,lowW,lowH);
     gbCtx.drawImage(cv,0,0,vw,vh,0,0,lowW,lowH);
     if(scheme!=='native'){            // 'native' = pixelize only, keep current textures/colors
-      const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+      const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+      const n=PAL.length;
       const img=gbCtx.getImageData(0,0,lowW,lowH), d=img.data;
       for(let y=0;y<lowH;y++)for(let x=0;x<lowW;x++){
         const i=(y*lowW+x)*4;
         let lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
         lum+=((GB_BAYER[y&3][x&3]+0.5)/16-0.5)*0.16;
-        const c=PAL[gbLevel(lum)];
+        const c=PAL[gbLevel(lum,n)];
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
       gbCtx.putImageData(img,0,0);
@@ -814,7 +911,7 @@ function applyGameBoy(px,scheme,colors){
 function applyColorClamp(scheme,colors){
   try{
     if(scheme==='native')return;
-    const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
     if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
     if(!gbCtx||!gbCtx.getImageData)return;
     if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
@@ -846,7 +943,7 @@ const gbPopVal=v=>{
   return ok?(px?k+'*':k):0;
 };
 const gbPalFor=key=>{
-  if(key==='custom'){ const c=(typeof level!=='undefined'&&level&&level.gb)?level.gb.colors:null; return (Array.isArray(c)&&c.length===4)?c:GB_SCHEMES.dmg; }
+  if(key==='custom'){ const c=(typeof level!=='undefined'&&level&&level.gb)?level.gb.colors:null; return (Array.isArray(c)&&c.length>=2)?c:GB_SCHEMES.dmg; }
   return GB_SCHEMES[key]||GB_SCHEMES.dmg;
 };
 // Redraw entities tagged .gbPop ON TOP of the GB scene so they stand out. 'full' = crisp full
@@ -872,11 +969,11 @@ function drawGbPops(t,editor){
   const groups={}; for(const [v,draw] of off){ (groups[v]=groups[v]||[]).push(draw); }
   const real=ctx;
   const recolor=(c2,w,h,key,dither)=>{
-    const PAL=gbPalFor(key), img=c2.getImageData(0,0,w,h), d=img.data;
+    const PAL=gbPalFor(key), n=PAL.length, img=c2.getImageData(0,0,w,h), d=img.data;
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){ const i=(y*w+x)*4; if(d[i+3]<8)continue;
       let lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
       if(dither)lum+=((GB_BAYER[y&3][x&3]+0.5)/16-0.5)*0.16;
-      const c=PAL[gbLevel(lum)]; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }
+      const c=PAL[gbLevel(lum,n)]; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }
     c2.setTransform(1,0,0,1,0,0); c2.putImageData(img,0,0);
   };
   try{
