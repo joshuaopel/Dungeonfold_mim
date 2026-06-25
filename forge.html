@@ -200,7 +200,7 @@ input[type=color]{padding:0}
   <div class="sep"></div>
   <label style="font-size:11px">Goal <input type="number" id="lvGoal" value="15" min="1"></label>
   <label style="font-size:11px" title="Darkness of unlit areas. Torches and the Mimic light up their surroundings. 0 = lighting off. See it in Playtest.">Dark <input type="range" id="lvAmbient" min="0" max="90" value="50" style="width:66px;vertical-align:middle"></label>
-  <label style="font-size:11px" title="Heist = sneak past invaders to your treasure. Plunder = race the invaders; they actively loot and cart gold to their entrance. Scare a carrier (Chest Snap / spike trap) to make them drop it. Ghost = reach the exit without ever being detected — the portal is open from the start and a single detection fails the run (gold is optional bonus).">Mode <select id="lvMode"><option value="heist">Heist</option><option value="plunder">Plunder</option><option value="ghost">Ghost</option></select></label>
+  <label style="font-size:11px" title="Heist = sneak past invaders to your treasure. Plunder = race the invaders; they actively loot and cart gold to their entrance. Scare a carrier (Chest Snap / spike trap) to make them drop it. Ghost = reach the exit without being seen — the portal is open from the start, and the instant any hero's vision cone touches you the run fails (disguise won't save you; use walls, props and line-of-sight to stay hidden). Gold is optional bonus.">Mode <select id="lvMode"><option value="heist">Heist</option><option value="plunder">Plunder</option><option value="ghost">Ghost</option></select></label>
   <span style="border-left:1px solid #3b2f58;padding-left:8px;margin-left:2px"></span>
   <label style="font-size:11px" title="Preview the Game Boy retro filter while editing. Affects the scene only — grid, waypoint numbers, labels and the instruction bar stay crisp.">GB <button id="edGB" title="Toggle Game Boy preview">Off</button></label> <label style="font-size:11px" title="Preview level lighting (ambient + torches) while editing so custom art tones match the game. Grid, labels and selection stay crisp.">Light <button id="edLight" title="Toggle lighting preview">On</button></label>
   <label style="font-size:11px" title="Game Boy palette">Pal <select id="edGBScheme"><option value="dmg">DMG Green</option><option value="grey">Pocket Grey</option><option value="dusk">Dusk Purple</option><option value="amber">Amber CRT</option><option value="ice">Ice Blue</option><option value="native">Native (no recolor)</option><option value="custom">Custom…</option></select></label>
@@ -2974,6 +2974,7 @@ function navTo(h,goal,speed,dt,repathDist){
 function updateHero(h,dt){
   const p=G.player,f=FORMS[p.form];
   const seen=heroCanSee(h);
+  if(seen&&G.mode==='ghost'){loseSeen(h);return;}   // strict ghost: entering any hero's vision cone ends it, disguise or not
   let gain;
   if(seen){
     if(p.form==='mimic') gain=95;

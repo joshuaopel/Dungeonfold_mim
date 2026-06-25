@@ -2465,6 +2465,7 @@ function navTo(h,goal,speed,dt,repathDist){
 function updateHero(h,dt){
   const p=G.player,f=FORMS[p.form];
   const seen=heroCanSee(h);
+  if(seen&&G.mode==='ghost'){loseSeen(h);return;}   // strict ghost: entering any hero's vision cone ends it, disguise or not
   let gain;
   if(seen){
     if(p.form==='mimic')gain=95;
