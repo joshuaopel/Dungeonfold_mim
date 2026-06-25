@@ -2920,8 +2920,8 @@ function renderPlay(t){
   if(G.player&&!G.over){const _pa=G.player,_pulse=0.15+Math.sin(t*2)*0.05;const _ag=ctx.createRadialGradient(_pa.x,_pa.y+10,0,_pa.x,_pa.y+10,34);_ag.addColorStop(0,'rgba(190,160,255,'+_pulse+')');_ag.addColorStop(1,'rgba(190,160,255,0)');ctx.save();ctx.fillStyle=_ag;ctx.beginPath();ctx.ellipse(_pa.x,_pa.y+10,34,20,0,0,TAU);ctx.fill();ctx.restore();}
   drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid});
   for(const to of curTorches())drawTorchAt(to,t);
-  if(G.gb&&G.gb.on){ buildLightmap(t); applyGameBoyLit(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.pixelate); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
-  else applyLighting(t);
+  if(G.gb&&G.gb.on){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors); else applyColorClamp(G.gb.scheme,G.gb.colors); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
+  applyLighting(t);
   if(G.gb&&G.gb.on) drawGbPops(t,false);
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
