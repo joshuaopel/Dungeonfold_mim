@@ -2957,6 +2957,35 @@ function gbSyncRamp(){
     clr.onclick=()=>{ pushUndo(); delete level.gb.ramp; _rampKey=null; gbSyncRamp(); };
     wrap.appendChild(clr);
   }
+  // Built-in preset ramps — click a swatch to apply it instantly.
+  const prow=document.createElement('span');
+  prow.style.cssText='display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle';
+  for(const name in RAMP_PRESETS){
+    const url=rampDataURL(RAMP_PRESETS[name]);
+    const b=document.createElement('button');
+    b.title=name+' ramp';
+    b.style.cssText='width:26px;height:14px;padding:0;border:1px solid #6a5590;border-radius:3px;cursor:pointer;background-size:cover;background-repeat:no-repeat;background-image:url('+url+')';
+    b.onclick=()=>{ pushUndo(); level.gb.ramp=url; _rampKey=null; gbSyncRamp(); };
+    prow.appendChild(b);
+  }
+  wrap.appendChild(prow);
+}
+// Preset ramp gradients (dark -> light). Each is a few evenly-spaced control colours.
+const RAMP_PRESETS={
+  Ember:[[20,12,28],[120,28,40],[214,84,34],[245,176,66],[255,240,200]],
+  Sea:[[8,18,40],[18,70,104],[44,140,170],[130,206,224],[236,252,255]],
+  Moss:[[10,20,12],[28,64,32],[78,120,48],[164,196,88],[238,246,196]],
+  Sepia:[[28,18,12],[78,52,32],[150,110,72],[212,176,128],[248,236,212]],
+  Mono:[[12,12,16],[92,92,100],[170,170,180],[224,224,232],[255,255,255]],
+  Dusk:[[24,16,46],[78,40,108],[168,66,150],[238,138,150],[252,224,210]]
+};
+function rampDataURL(cols){
+  const c=document.createElement('canvas'); c.width=256; c.height=8;
+  const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,256,0);
+  cols.forEach((col,i)=>g.addColorStop(i/(cols.length-1||1),'rgb('+col.join(',')+')'));
+  x.fillStyle=g; x.fillRect(0,0,256,8);
+  return c.toDataURL('image/png');
 }
 document.getElementById('edGBScheme').onchange=e=>{ pushUndo(); const sel=document.getElementById('edGBScheme'); const v=(e&&e.target&&e.target.value)||sel.value; level.gb.scheme=(['dmg','grey','dusk','amber','ice','native','custom','ramp'].includes(v)?v:'dmg'); if(v!=='custom'&&v!=='ramp'&&sel.dataset)sel.dataset.prev=v; gbSyncCustom(); gbSyncRamp(); };
 document.getElementById('edGBPx').oninput=e=>{ level.gb.px=clamp(Math.round(+e.target.value||5),1,12); };
