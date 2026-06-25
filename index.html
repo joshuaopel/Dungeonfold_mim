@@ -1158,14 +1158,25 @@ function applyColorClamp(scheme,colors){
   try{
     if(scheme==='native')return;
     const PAL=(Array.isArray(colors)&&colors.length===4)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
-    ctx.setTransform(1,0,0,1,0,0);
-    const img=ctx.getImageData(0,0,vw,vh),d=img.data,W=vw,H=vh;
-    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-      const i=(y*W+x)*4; if(d[i+3]<8)continue;
-      const lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-      const c=PAL[gbLevel(lum)]; d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;
+    if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
+    if(!gbCtx||!gbCtx.getImageData)return;
+    if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
+    gbCtx.drawImage(cv,0,0);
+    const img=gbCtx.getImageData(0,0,vw,vh);
+    const d32=new Uint32Array(img.data.buffer);
+    // Pre-pack palette as little-endian ABGR (matches canvas Uint32 layout: R|G<<8|B<<16|A<<24)
+    const p0=(0xFF000000|(PAL[0][2]<<16)|(PAL[0][1]<<8)|PAL[0][0])>>>0;
+    const p1=(0xFF000000|(PAL[1][2]<<16)|(PAL[1][1]<<8)|PAL[1][0])>>>0;
+    const p2=(0xFF000000|(PAL[2][2]<<16)|(PAL[2][1]<<8)|PAL[2][0])>>>0;
+    const p3=(0xFF000000|(PAL[3][2]<<16)|(PAL[3][1]<<8)|PAL[3][0])>>>0;
+    for(let i=0,n=d32.length;i<n;i++){
+      const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
+      const lv=299*r+587*g+114*b; // integer lum * 1000 * 255, range 0-255000
+      d32[i]=lv<63750?p0:lv<127500?p1:lv<191250?p2:p3;
     }
-    ctx.putImageData(img,0,0);
+    gbCtx.putImageData(img,0,0);
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.drawImage(gbBuf,0,0);
   }catch(e){}
 }
 // Normalise a gbPop tag. Value = 0 (off) | 'full' | a scheme name | 'custom', with an optional
