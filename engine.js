@@ -69,9 +69,9 @@ const FORMS={
 const PROP_KINDS=['sack','vase','barrel','chest','statue'];
 const OCCL={barrel:13,chest:14,statue:18};
 const HERO_DEFS={
-  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0},
-  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick']},
-  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8},
+  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0,hearing:200},
+  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick'],hearing:300},
+  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8,hearing:130},
 };
 const TREASURE_VAL={gold:1,gem:3,artifact:5};
 
@@ -410,6 +410,22 @@ function updateInter(dt){
       }
     }
   }
+  // tile triggers — fire once per tile; re-arm when player steps to a different tile
+  if(level.triggers&&level.triggers.length){
+    const pc=Math.floor(G.player.x/TS),pr=Math.floor(G.player.y/TS),pk=pc+','+pr;
+    if(pk!==G.stepKey){
+      G.stepKey=pk;
+      for(const trig of level.triggers){
+        if(trig.c!==pc||trig.r!==pr)continue;
+        if(trig.once&&trig.fired)continue;
+        trig.fired=true;
+        if(trig.effect==='creak'){sfx('click');noiseAt(G.player.x,G.player.y,trig.vol!=null?trig.vol:0.8);}
+        else if(trig.effect==='alarm'){addFlash('255,140,0',0.5);sfx('alert');for(const h of G.heroes)if(h.state!=='scared'){h.suspicion=clamp(h.suspicion+65,0,100);h.lastSeen={x:G.player.x,y:G.player.y};}}
+        else if(trig.effect==='trap'){if(!G.over)lose({name:'Floor Trap'});}
+        else if(trig.effect==='teleport'){const tx=(trig.tc+0.5)*TS,ty=(trig.tr+0.5)*TS;G.player.x=tx;G.player.y=ty;sfx('morph');poof(tx,ty,PAL.mimicBody);}
+      }
+    }
+  }
 }
 
 /* ---- pushable props: Mim can shove a prop in a direction (puzzle plates / blockers) ---- */
@@ -486,6 +502,23 @@ function tryMorph(){
 }
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function say(who,text){G.bubbles.push({who,text,t:2.4});}
+/* ---- noiseAt: emit a sound burst; nearby heroes investigate the source ---- */
+function noiseAt(x,y,vol){
+  if(!G||!G.heroes)return;
+  vol=(vol==null?1:vol);
+  for(const h of G.heroes){
+    if(h.state==='chase'||h.state==='scared')continue;
+    const d=dist(h,{x,y}),range=(h.hearing||200)*vol;
+    if(d>=range)continue;
+    const gain=30*h.perc*(1-d/range);
+    h.suspicion=clamp(h.suspicion+gain,0,100);
+    if(h.state!=='investigate'&&h.state!=='lured'){
+      h.state='investigate';clearNav(h);
+      h.poi={x,y};h.pauseT=1.8;
+      say(h,pick(['What was that?','...Hello?','I heard something!']));
+    } else if(h.state==='investigate'){h.poi={x,y};}
+  }
+}
 function moveDirect(h,target,speed,dt){
   const a=angTo(h,target);
   h.ang=lerpAngle(h.ang,a,clamp(dt*6,0,1));

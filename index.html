@@ -412,9 +412,9 @@ const FORMS={
 const PROP_KINDS=['sack','vase','barrel','chest','statue'];
 const OCCL={barrel:13,chest:14,statue:18};
 const HERO_DEFS={
-  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0},
-  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick']},
-  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8},
+  fighter:{color:PAL.fighter,speed:95,chaseSpeed:215,cone:{len:240,fov:0.62},perc:1.0,hearing:200},
+  rogue:{color:PAL.rogue,speed:85,chaseSpeed:200,cone:{len:170,fov:1.15},perc:1.55,abilities:['lockpick'],hearing:300},
+  wizard:{color:PAL.wizard,speed:60,chaseSpeed:165,cone:{len:200,fov:0.8},perc:0.8,hearing:130},
 };
 const TREASURE_VAL={gold:1,gem:3,artifact:5};
 
@@ -753,6 +753,22 @@ function updateInter(dt){
       }
     }
   }
+  // tile triggers — fire once per tile; re-arm when player steps to a different tile
+  if(level.triggers&&level.triggers.length){
+    const pc=Math.floor(G.player.x/TS),pr=Math.floor(G.player.y/TS),pk=pc+','+pr;
+    if(pk!==G.stepKey){
+      G.stepKey=pk;
+      for(const trig of level.triggers){
+        if(trig.c!==pc||trig.r!==pr)continue;
+        if(trig.once&&trig.fired)continue;
+        trig.fired=true;
+        if(trig.effect==='creak'){sfx('click');noiseAt(G.player.x,G.player.y,trig.vol!=null?trig.vol:0.8);}
+        else if(trig.effect==='alarm'){addFlash('255,140,0',0.5);sfx('alert');for(const h of G.heroes)if(h.state!=='scared'){h.suspicion=clamp(h.suspicion+65,0,100);h.lastSeen={x:G.player.x,y:G.player.y};}}
+        else if(trig.effect==='trap'){if(!G.over)lose({name:'Floor Trap'});}
+        else if(trig.effect==='teleport'){const tx=(trig.tc+0.5)*TS,ty=(trig.tr+0.5)*TS;G.player.x=tx;G.player.y=ty;sfx('morph');poof(tx,ty,PAL.mimicBody);}
+      }
+    }
+  }
 }
 
 /* ---- pushable props: Mim can shove a prop in a direction (puzzle plates / blockers) ---- */
@@ -829,6 +845,23 @@ function tryMorph(){
 }
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function say(who,text){G.bubbles.push({who,text,t:2.4});}
+/* ---- noiseAt: emit a sound burst; nearby heroes investigate the source ---- */
+function noiseAt(x,y,vol){
+  if(!G||!G.heroes)return;
+  vol=(vol==null?1:vol);
+  for(const h of G.heroes){
+    if(h.state==='chase'||h.state==='scared')continue;
+    const d=dist(h,{x,y}),range=(h.hearing||200)*vol;
+    if(d>=range)continue;
+    const gain=30*h.perc*(1-d/range);
+    h.suspicion=clamp(h.suspicion+gain,0,100);
+    if(h.state!=='investigate'&&h.state!=='lured'){
+      h.state='investigate';clearNav(h);
+      h.poi={x,y};h.pauseT=1.8;
+      say(h,pick(['What was that?','...Hello?','I heard something!']));
+    } else if(h.state==='investigate'){h.poi={x,y};}
+  }
+}
 function moveDirect(h,target,speed,dt){
   const a=angTo(h,target);
   h.ang=lerpAngle(h.ang,a,clamp(dt*6,0,1));
@@ -884,7 +917,6 @@ function checkRace(){
 }
 function loseRace(){ if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
 function lose(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
-function loseSeen(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,{name:h.name,seen:true});}
 function cdBar(id,frac){
   const el=document.getElementById(id);
   el.querySelector('.cd').style.height=(frac*100)+'%';
@@ -892,14 +924,6 @@ function cdBar(id,frac){
 }
 const fmtTime=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 function updateGoalHUD(){
-  const gl=document.getElementById('goalLabel');
-  if(G&&G.mode==='ghost'){
-    if(gl)gl.textContent=t('goal_ghost');
-    document.getElementById('goalValue').textContent='Stay unseen ✦'+(G.goalValue?'   +'+G.goalValue+' '+t('meta_gold'):'');
-    document.getElementById('goalBar').style.width='100%';
-    return;
-  }
-  if(gl)gl.textContent=t('goal_label');
   const extra=(G&&G.mode==='plunder')?'   invaders '+G.invaderLoot:'';
   document.getElementById('goalValue').textContent=Math.min(G.goalValue,G.goal)+' / '+G.goal+(G.portal.active?'  ✦':'')+extra;
   document.getElementById('goalBar').style.width=clamp(G.goalValue/G.goal*100,0,100)+'%';
@@ -1603,7 +1627,7 @@ function blankLevel(cols,rows){
   return {name:'Dungeon',cols,rows,goal:15,blurb:'',author:'',music:null,musicName:'',v:2,intro:[],outro:[],assets:{},aidn:0,ambient:0.5,objDefs:[],objects:[],odn:0,mode:'heist',enemyDefs:[],endn:0,gb:{on:false,scheme:'dmg',px:5,pixelate:true},
     tiles:new Array(cols*rows).fill(0),
     spawn:{x:TS*2.5,y:TS*2.5},portal:{x:TS*(cols-2.5),y:TS*(rows-2.5)},
-    props:[],treasures:[],heroes:[],torches:[],decals:[],inter:[],links:[],iid:1,art:{}};
+    props:[],treasures:[],heroes:[],torches:[],decals:[],inter:[],links:[],iid:1,art:{},triggers:[]};
 }
 const setT=(lv,c,r,v)=>{if(c>=0&&r>=0&&c<lv.cols&&r<lv.rows)lv.tiles[r*lv.cols+c]=v;};
 function autoWall(lv){
@@ -1633,6 +1657,7 @@ function sanitizeLevel(raw){
         sightLen:clamp(+e.sightLen||220,40,520), sightFov:clamp(+e.sightFov||0.7,0.2,2.2),
         perc:clamp(+e.perc||1,0.2,3), capacity:clamp(Math.round(+e.capacity||1),1,6),
         carrySlow:clamp(+e.carrySlow||0,0,0.8),
+        hearing:clamp(+e.hearing||200,40,500),
         abilities:Array.isArray(e.abilities)?e.abilities.filter(a=>ABILS.includes(a)):[] });
     }
   }
@@ -1700,6 +1725,15 @@ function sanitizeLevel(raw){
    lv.objects=[];
    for(const o of (raw.objects||[])) if(o&&ids.has(o.d)) lv.objects.push({d:o.d,x:+o.x||0,y:+o.y||0,r:+o.r||0,f:o.f?1:0});}
   lv.odn=Math.max(0,+raw.odn||0);
+  lv.triggers=[];
+  for(const trig of (raw.triggers||[])){
+    const eff=trig&&trig.effect;
+    if(!['creak','alarm','trap','teleport'].includes(eff))continue;
+    const tr={c:Math.round(+trig.c)||0,r:Math.round(+trig.r)||0,effect:eff,once:!!trig.once,fired:false};
+    if(eff==='creak')tr.vol=clamp(+(trig.vol)||0.8,0.1,1.0);
+    if(eff==='teleport'){tr.tc=Math.round(+trig.tc)||0;tr.tr=Math.round(+trig.tr)||0;}
+    lv.triggers.push(tr);
+  }
   lv.ambient=(raw.ambient==null||isNaN(+raw.ambient))?0.5:clamp(+raw.ambient,0,0.92);
   lv.v=2;
   if(raw.art&&typeof raw.art==='object'){
@@ -2262,10 +2296,11 @@ function resolveEnemy(h){
   let perc=(def&&def.perc!=null)?def.perc:b.perc;
   let capacity=(def&&def.capacity)?def.capacity:1;
   let carrySlow=(def&&def.carrySlow!=null)?def.carrySlow:0;
+  let hearing=(def&&def.hearing!=null)?def.hearing:(b.hearing||200);
   const abil=def?(def.abilities||[]).slice():(b.abilities||[]).slice();
   if(abil.indexOf('keensight')>=0){ len*=1.4; fov=Math.min(2.4,fov*1.2); }
   if(abil.indexOf('sprinter')>=0){ chaseSpeed*=1.35; }
-  return {color:b.color,speed,chaseSpeed,cone:{len,fov},perc,abil,capacity,carrySlow};
+  return {color:b.color,speed,chaseSpeed,cone:{len,fov},perc,abil,capacity,carrySlow,hearing};
 }
 function startPlay(){
   screenFade();
@@ -2277,7 +2312,7 @@ function startPlay(){
       path:h.path.map(p=>({...p})),r:17,ang:rnd(0,TAU),suspicion:0,state:'patrol',wp:0,
       pauseT:0,poi:null,lastSeen:null,loseT:0,lureT:0,lure:null,scareT:0,fooled:{},
       home:{x:h.x,y:h.y},scanDir:1,load:[],cap:d.capacity,carrySlow:d.carrySlow,abil:d.abil,pickDoor:null,pickT:0,
-      route:null,routeI:0,routeGoal:null,repathT:0};
+      route:null,routeI:0,routeGoal:null,repathT:0,hearing:d.hearing};
   });
   const total=level.treasures.reduce((s,t)=>s+TREASURE_VAL[t.kind],0);
   G={heroes,
@@ -2288,7 +2323,7 @@ function startPlay(){
             eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
     portal:{x:level.portal.x,y:level.portal.y,r:34,active:(level.mode==='ghost'),spin:0},
     runTime:0,detections:0,chaos:0,goalValue:0,decoyId:0,mode:level.mode||'heist',invaderLoot:0,gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
-    goal:Math.min(level.goal,Math.max(total,1)),showMap:true,over:false,paused:false,
+    goal:Math.min(level.goal,Math.max(total,1)),showMap:true,over:false,paused:false,stepKey:'',
     torches:level.torches.map(to=>({...to,on:!!(to.start==null?1:to.start)})),
     inter:level.inter.map(it=>({...it,active:false,flip:false,open:!!it.init,on:!!it.init,prevOpen:null,prevOn:null,picked:false,show:(it.kind==='hint'&&it.mode==='label')?1:0})),
     links:level.links.map(l=>[l[0],l[1]])};
@@ -2475,6 +2510,10 @@ function updateHero(h,dt){
   } else gain=-15;
   if(h.state==='scared'||h.state==='lured')gain=Math.min(gain,0);
   h.suspicion=clamp(h.suspicion+gain*dt,0,100);
+  if(!seen&&p.moving&&!p.sneak){
+    const hd=dist(h,p),hr=h.hearing||200;
+    if(hd<hr)h.suspicion=clamp(h.suspicion+8*h.perc*(1-hd/hr)*dt,0,100);
+  }
   if(h.kind==='wizard'&&h.state!=='scared'){
     h.pulseT-=dt;
     if(h.pulseT<=0){
@@ -2614,8 +2653,36 @@ function updatePlay(dt){
   if(G.portal.active&&dist(p,G.portal)<G.portal.r+f.r-6)win();
   document.getElementById('timer').textContent=fmtTime(G.runTime);
   cdBar('abDecoy',p.cdDecoy/10);cdBar('abSnap',p.cdSnap/20);
+  updateTension();
+}
+let TENS_OSC=null,TENS_GAIN=null;
+function startTensionOsc(){
+  if(TENS_OSC||!AUDIO.music)return;
+  try{
+    const a=ac();
+    TENS_GAIN=a.createGain();TENS_GAIN.gain.value=0;
+    const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=500;
+    TENS_GAIN.connect(lp);lp.connect(a.destination);
+    TENS_OSC=a.createOscillator();TENS_OSC.type='sawtooth';TENS_OSC.frequency.value=55;
+    TENS_OSC.connect(TENS_GAIN);TENS_OSC.start();
+  }catch(e){TENS_OSC=null;TENS_GAIN=null;}
+}
+function stopTensionOsc(){
+  try{if(TENS_OSC)TENS_OSC.stop();}catch(e){}
+  TENS_OSC=null;TENS_GAIN=null;
+}
+function updateTension(){
+  if(!G||!G.heroes||G.over||!AUDIO.music){stopTensionOsc();return;}
+  const maxSus=G.heroes.reduce((m,h)=>Math.max(m,h.suspicion),0);
+  const t=clamp(maxSus/100,0,1);
+  if(t>0.04&&!TENS_OSC)startTensionOsc();
+  if(!TENS_OSC)return;
+  const a=ac(),now=a.currentTime;
+  TENS_GAIN.gain.setTargetAtTime(t*0.04,now,0.5);
+  TENS_OSC.frequency.setTargetAtTime(55+t*33,now,0.4);
 }
 function showEnd(won,h){
+  stopTensionOsc();
   stopMusic();
   const treasurePts=G.goalValue*100;
   const timeBonus=won?Math.max(0,Math.floor((300-G.runTime))*10):0;
