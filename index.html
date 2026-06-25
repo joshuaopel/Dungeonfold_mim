@@ -1238,7 +1238,7 @@ let _lightmapReady=false; // set true by buildLightmap on success, prevents stal
 // At lightLum=0 result is always 0 → PAL[0] (full darkness = darkest color).
 function applyGameBoyLit(px,scheme,colors,pixelate){
   try{
-    const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
     const n=PAL.length;
     if(!gbBuf){gbBuf=document.createElement('canvas');gbCtx=gbBuf.getContext('2d',{willReadFrequently:true});}
     if(!gbCtx||!gbCtx.getImageData)return;
@@ -1317,7 +1317,7 @@ function applyGameBoy(px,scheme,colors){
     gbCtx.clearRect(0,0,lowW,lowH);
     gbCtx.drawImage(cv,0,0,vw,vh,0,0,lowW,lowH);
     if(scheme!=='native'){            // 'native' = pixelize only, keep current textures/colors
-      const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+      const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
       const n=PAL.length;
       const img=gbCtx.getImageData(0,0,lowW,lowH), d=img.data;
       for(let y=0;y<lowH;y++)for(let x=0;x<lowW;x++){
@@ -1338,7 +1338,7 @@ function applyGameBoy(px,scheme,colors){
 function applyColorClamp(scheme,colors){
   try{
     if(scheme==='native')return;
-    const PAL=(Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+    const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
     if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
     if(!gbCtx||!gbCtx.getImageData)return;
     if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
