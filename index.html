@@ -3191,7 +3191,7 @@ function rndr(from, to) {
   return Math.random() * (to - from) + from;
 }
 
-function rnd(max) {
+function _srnd(max) {
   return Math.floor(Math.random() * (max + 1));
 }
 
@@ -3314,7 +3314,7 @@ Params.prototype.pickupCoin = function () {
   this.p_env_sustain = frnd(0.1);
   this.p_env_decay = 0.1 + frnd(0.4);
   this.p_env_punch = 0.3 + frnd(0.3);
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_arp_speed = 0.5 + frnd(0.2);
     this.p_arp_mod = 0.2 + frnd(0.4);
   }
@@ -3322,10 +3322,10 @@ Params.prototype.pickupCoin = function () {
 }
 
 Params.prototype.laserShoot = function () {
-  this.wave_type = rnd(2);
-  if(this.wave_type === SINE && rnd(1))
-    this.wave_type = rnd(1);
-  if (rnd(2) === 0) {
+  this.wave_type = _srnd(2);
+  if(this.wave_type === SINE && _srnd(1))
+    this.wave_type = _srnd(1);
+  if (_srnd(2) === 0) {
     this.p_base_freq = 0.3 + frnd(0.6);
     this.p_freq_limit = frnd(0.1);
     this.p_freq_ramp = -0.35 - frnd(0.3);
@@ -3337,7 +3337,7 @@ Params.prototype.laserShoot = function () {
   }
   if (this.wave_type === SAWTOOTH)
     this.p_duty = 1;
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_duty = frnd(0.5);
     this.p_duty_ramp = frnd(0.2);
   } else {
@@ -3347,13 +3347,13 @@ Params.prototype.laserShoot = function () {
   this.p_env_attack = 0;
   this.p_env_sustain = 0.1 + frnd(0.2);
   this.p_env_decay = frnd(0.4);
-  if (rnd(1))
+  if (_srnd(1))
     this.p_env_punch = frnd(0.3);
-  if (rnd(2) === 0) {
+  if (_srnd(2) === 0) {
     this.p_pha_offset = frnd(0.2);
     this.p_pha_ramp = -frnd(0.2);
   }
-  //if (rnd(1))
+  //if (_srnd(1))
     this.p_hpf_freq = frnd(0.3);
 
   return this;
@@ -3361,30 +3361,30 @@ Params.prototype.laserShoot = function () {
 
 Params.prototype.explosion = function () {
   this.wave_type = NOISE;
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_base_freq = sqr(0.1 + frnd(0.4));
     this.p_freq_ramp = -0.1 + frnd(0.4);
   } else {
     this.p_base_freq = sqr(0.2 + frnd(0.7));
     this.p_freq_ramp = -0.2 - frnd(0.2);
   }
-  if (rnd(4) === 0)
+  if (_srnd(4) === 0)
     this.p_freq_ramp = 0;
-  if (rnd(2) === 0)
+  if (_srnd(2) === 0)
     this.p_repeat_speed = 0.3 + frnd(0.5);
   this.p_env_attack = 0;
   this.p_env_sustain = 0.1 + frnd(0.3);
   this.p_env_decay = frnd(0.5);
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_pha_offset = -0.3 + frnd(0.9);
     this.p_pha_ramp = -frnd(0.3);
   }
   this.p_env_punch = 0.2 + frnd(0.6);
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_vib_strength = frnd(0.7);
     this.p_vib_speed = frnd(0.6);
   }
-  if (rnd(2) === 0) {
+  if (_srnd(2) === 0) {
     this.p_arp_speed = 0.6 + frnd(0.3);
     this.p_arp_mod = 0.8 - frnd(1.6);
   }
@@ -3393,19 +3393,19 @@ Params.prototype.explosion = function () {
 }
 
 Params.prototype.powerUp = function () {
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.wave_type = SAWTOOTH;
     this.p_duty = 1;
   } else {
     this.p_duty = frnd(0.6);
   }
   this.p_base_freq = 0.2 + frnd(0.3);
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_freq_ramp = 0.1 + frnd(0.4);
     this.p_repeat_speed = 0.4 + frnd(0.4);
   } else {
     this.p_freq_ramp = 0.05 + frnd(0.2);
-    if (rnd(1)) {
+    if (_srnd(1)) {
       this.p_vib_strength = frnd(0.7);
       this.p_vib_speed = frnd(0.6);
     }
@@ -3418,7 +3418,7 @@ Params.prototype.powerUp = function () {
 }
 
 Params.prototype.hitHurt = function () {
-  this.wave_type = rnd(2);
+  this.wave_type = _srnd(2);
   if (this.wave_type === SINE)
     this.wave_type = NOISE;
   if (this.wave_type === SQUARE)
@@ -3430,7 +3430,7 @@ Params.prototype.hitHurt = function () {
   this.p_env_attack = 0;
   this.p_env_sustain = frnd(0.1);
   this.p_env_decay = 0.1 + frnd(0.2);
-  if (rnd(1))
+  if (_srnd(1))
     this.p_hpf_freq = frnd(0.3);
   return this;
 }
@@ -3443,15 +3443,15 @@ Params.prototype.jump = function () {
   this.p_env_attack = 0;
   this.p_env_sustain = 0.1 + frnd(0.3);
   this.p_env_decay = 0.1 + frnd(0.2);
-  if (rnd(1))
+  if (_srnd(1))
     this.p_hpf_freq = frnd(0.3);
-  if (rnd(1))
+  if (_srnd(1))
     this.p_lpf_freq = 1 - frnd(0.6);
   return this;
 }
 
 Params.prototype.blipSelect = function () {
-  this.wave_type = rnd(1);
+  this.wave_type = _srnd(1);
   if (this.wave_type === SQUARE)
     this.p_duty = frnd(0.6);
   else
@@ -3465,21 +3465,21 @@ Params.prototype.blipSelect = function () {
 }
 
 Params.prototype.synth = function () {
-  this.wave_type = rnd(1);
-  this.p_base_freq = [0.2723171360931539, 0.19255692561524382, 0.13615778746815113][rnd(2)];
-  this.p_env_attack = rnd(4) > 3 ? frnd(0.5) : 0;
+  this.wave_type = _srnd(1);
+  this.p_base_freq = [0.2723171360931539, 0.19255692561524382, 0.13615778746815113][_srnd(2)];
+  this.p_env_attack = _srnd(4) > 3 ? frnd(0.5) : 0;
   this.p_env_sustain = frnd(1);
   this.p_env_punch = frnd(1);
   this.p_env_decay = frnd(0.9) + 0.1;
-  this.p_arp_mod = [0, 0, 0, 0, -0.3162, 0.7454, 0.7454][rnd(6)];
+  this.p_arp_mod = [0, 0, 0, 0, -0.3162, 0.7454, 0.7454][_srnd(6)];
   this.p_arp_speed = frnd(0.5) + 0.4;
   this.p_duty = frnd(1);
-  this.p_duty_ramp = rnd(2) == 2 ? frnd(1) : 0;
-  this.p_lpf_freq = [1, 0.9 * frnd(1) * frnd(1) + 0.1][rnd(1)];
+  this.p_duty_ramp = _srnd(2) == 2 ? frnd(1) : 0;
+  this.p_lpf_freq = [1, 0.9 * frnd(1) * frnd(1) + 0.1][_srnd(1)];
   this.p_lpf_ramp = rndr(-1, 1);
   this.p_lpf_resonance = frnd(1);
-  this.p_hpf_freq = rnd(3) == 3 ? frnd(1) : 0;
-  this.p_hpf_ramp = rnd(3) == 3 ? frnd(1) : 0;
+  this.p_hpf_freq = _srnd(3) == 3 ? frnd(1) : 0;
+  this.p_hpf_ramp = _srnd(3) == 3 ? frnd(1) : 0;
   return this;
 }
 
@@ -3494,16 +3494,16 @@ Params.prototype.tone = function () {
 }
 
 Params.prototype.click = function() {
-  const base = ["explosion", "hitHurt"][rnd(1)];
+  const base = ["explosion", "hitHurt"][_srnd(1)];
   this[base]();
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_freq_ramp = -0.5 + frnd(1.0);
   }
-  if (rnd(1)) {
+  if (_srnd(1)) {
     this.p_env_sustain = (frnd(0.4) + 0.2) * this.p_env_sustain;
     this.p_env_decay = (frnd(0.4) + 0.2) * this.p_env_decay;
   }
-  if (rnd(3) == 0) {
+  if (_srnd(3) == 0) {
     this.p_env_attack = frnd(0.3);
   }
   this.p_base_freq = 1 - frnd(0.25);
@@ -3512,8 +3512,8 @@ Params.prototype.click = function() {
 }
 
 Params.prototype.random = function () {
-  this.wave_type = rnd(3);
-  if (rnd(1))
+  this.wave_type = _srnd(3);
+  if (_srnd(1))
     this.p_base_freq = cube(frnd(2) - 1) + 0.5;
   else
     this.p_base_freq = sqr(frnd(1));
@@ -3552,28 +3552,28 @@ Params.prototype.random = function () {
 }
 
 Params.prototype.mutate = function () {
-  if (rnd(1)) this.p_base_freq += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_freq_ramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_freq_dramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_duty += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_duty_ramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_vib_strength += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_vib_speed += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_vib_delay += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_env_attack += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_env_sustain += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_env_decay += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_env_punch += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_lpf_resonance += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_lpf_freq += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_lpf_ramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_hpf_freq += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_hpf_ramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_pha_offset += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_pha_ramp += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_repeat_speed += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_arp_speed += frnd(0.1) - 0.05;
-  if (rnd(1)) this.p_arp_mod += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_base_freq += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_freq_ramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_freq_dramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_duty += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_duty_ramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_vib_strength += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_vib_speed += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_vib_delay += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_env_attack += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_env_sustain += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_env_decay += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_env_punch += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_lpf_resonance += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_lpf_freq += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_lpf_ramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_hpf_freq += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_hpf_ramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_pha_offset += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_pha_ramp += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_repeat_speed += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_arp_speed += frnd(0.1) - 0.05;
+  if (_srnd(1)) this.p_arp_mod += frnd(0.1) - 0.05;
   return this;
 }
 
