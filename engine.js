@@ -964,7 +964,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
   }catch(e){}
 }
 
-function applyGameBoy(px,scheme,colors){
+function applyGameBoy(px,scheme,colors,curve){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -985,10 +985,12 @@ function applyGameBoy(px,scheme,colors){
       for(let p=0;p<N;p++){ const i=p*4; const L=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255; if(L<lo)lo=L; if(L>hi)hi=L; }
       _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
-      // Pass 2: stretch to [0,1], then map deterministically (no dither -> same source value = same color).
+      // Pass 2: stretch to [0,1], apply gamma curve, then map deterministically.
+      const gamma=Math.max(0.1,curve||1);
       for(let p=0;p<N;p++){
         const i=p*4;
-        const L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
+        let L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
+        if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
         const c=PAL[gbLevel(L,n)];
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
@@ -1000,7 +1002,7 @@ function applyGameBoy(px,scheme,colors){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors){
+function applyColorClamp(scheme,colors,curve){
   try{
     if(scheme==='native')return;
     const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
@@ -1020,9 +1022,11 @@ function applyColorClamp(scheme,colors){
     for(let i=0;i<len;i++){ const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF; const L=(299*r+587*g+114*b)/255000; if(L<lo)lo=L; if(L>hi)hi=L; }
     _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+    const gamma=Math.max(0.1,curve||1);
     for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      const L=((299*r+587*g+114*b)/255000-base)/span;
+      let L=((299*r+587*g+114*b)/255000-base)/span;
+      if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
       d32[i]=packed[gbLevel(L,n)];
     }
     gbCtx.putImageData(img,0,0);

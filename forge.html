@@ -206,6 +206,7 @@ input[type=color]{padding:0}
   <label style="font-size:11px" title="Game Boy palette">Pal <select id="edGBScheme"><option value="dmg">DMG Green</option><option value="grey">Pocket Grey</option><option value="dusk">Dusk Purple</option><option value="amber">Amber CRT</option><option value="ice">Ice Blue</option><option value="native">Native (no recolor)</option><option value="custom">Custom…</option></select></label>
   <span id="edGBCustom" style="display:none;vertical-align:top;min-width:180px" title="Custom color ramp — up to 16 stops, ordered dark to light. Click any swatch to pick a color. + adds a stop, ✕ removes it."></span>
   <label style="font-size:11px" title="Game Boy pixel size — 1 = full-resolution (color/dither only), higher = chunkier blocks.">Px <input type="range" id="edGBPx" min="1" max="12" value="5" style="width:66px;vertical-align:middle"></label>
+  <label style="font-size:11px" title="Palette curve (gamma). Left = more stops in bright areas, centre = linear, right = more stops in dark areas.">Curve <input type="range" id="edGBCurve" min="0.3" max="3" step="0.05" value="1" style="width:66px;vertical-align:middle"> <span id="edGBCurveVal" style="font-size:10px;opacity:0.7">1.0</span></label>
   <label style="font-size:11px" title="When checked, the scene is downscaled to chunky blocks (classic Game Boy look). Uncheck to apply only the color palette — full art resolution, no pixelation."><input type="checkbox" id="edGBPixelate" checked style="vertical-align:middle"> Pixelate</label>
   <label style="font-size:11px" title="Make the player pop in a chosen palette so you can always find yourself — visual only, does not affect stealth">Player <select id="edGBPlayer"><option value="0">Filtered</option><option value="full">Full colour</option><option value="dmg">DMG</option><option value="grey">Pocket</option><option value="dusk">Dusk</option><option value="amber">Amber</option><option value="ice">Ice</option><option value="custom">Custom</option></select></label>
   <label style="font-size:11px" title="Pixelate the player's pop to match the scene blocks"><input type="checkbox" id="edGBPlayerPx" style="vertical-align:middle"> px</label>
@@ -1302,7 +1303,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
   }catch(e){}
 }
 
-function applyGameBoy(px,scheme,colors){
+function applyGameBoy(px,scheme,colors,curve){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -1323,10 +1324,12 @@ function applyGameBoy(px,scheme,colors){
       for(let p=0;p<N;p++){ const i=p*4; const L=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255; if(L<lo)lo=L; if(L>hi)hi=L; }
       _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
-      // Pass 2: stretch to [0,1], then map deterministically (no dither -> same source value = same color).
+      // Pass 2: stretch to [0,1], apply gamma curve, then map deterministically.
+      const gamma=Math.max(0.1,curve||1);
       for(let p=0;p<N;p++){
         const i=p*4;
-        const L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
+        let L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
+        if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
         const c=PAL[gbLevel(L,n)];
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
@@ -1338,7 +1341,7 @@ function applyGameBoy(px,scheme,colors){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors){
+function applyColorClamp(scheme,colors,curve){
   try{
     if(scheme==='native')return;
     const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
@@ -1358,9 +1361,11 @@ function applyColorClamp(scheme,colors){
     for(let i=0;i<len;i++){ const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF; const L=(299*r+587*g+114*b)/255000; if(L<lo)lo=L; if(L>hi)hi=L; }
     _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+    const gamma=Math.max(0.1,curve||1);
     for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      const L=((299*r+587*g+114*b)/255000-base)/span;
+      let L=((299*r+587*g+114*b)/255000-base)/span;
+      if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
       d32[i]=packed[gbLevel(L,n)];
     }
     gbCtx.putImageData(img,0,0);
@@ -2875,6 +2880,7 @@ function gbSyncCustom(){
 }
 document.getElementById('edGBScheme').onchange=e=>{ pushUndo(); const sel=document.getElementById('edGBScheme'); const v=(e&&e.target&&e.target.value)||sel.value; level.gb.scheme=(['dmg','grey','dusk','amber','ice','native','custom'].includes(v)?v:'dmg'); if(v!=='custom'&&sel.dataset)sel.dataset.prev=v; gbSyncCustom(); };
 document.getElementById('edGBPx').oninput=e=>{ level.gb.px=clamp(Math.round(+e.target.value||5),1,12); };
+document.getElementById('edGBCurve').oninput=e=>{ level.gb.curve=Math.max(0.1,+e.target.value||1); document.getElementById('edGBCurveVal').textContent=level.gb.curve.toFixed(2); };
 document.getElementById('edGBPixelate').onchange=e=>{ level.gb.pixelate=e.target.checked; };
 document.getElementById('edGBPlayer').onchange=e=>{ pushUndo(); const v=e.target.value; const wasPx=String(level.gb.player||'').endsWith('*'); level.gb.player=(v==='0'?0:(wasPx?v+'*':v)); };
 document.getElementById('edGBPlayerPx').onchange=e=>{ pushUndo(); const k=String(level.gb.player||'').replace('*',''); if(k&&k!=='0')level.gb.player=e.target.checked?k+'*':k; };
@@ -3021,10 +3027,12 @@ function syncBarFromLevel(){
   document.getElementById('lvRows').value=level.rows;
   document.getElementById('lvAmbient').value=Math.round((level.ambient==null?0.5:level.ambient)*100);
   document.getElementById('lvMode').value=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
-  if(!level.gb)level.gb={on:false,scheme:'dmg',px:5,pixelate:true};
+  if(!level.gb)level.gb={on:false,scheme:'dmg',px:5,pixelate:true,curve:1};
   document.getElementById('edGB').textContent=level.gb.on?'On':'Off';
   document.getElementById('edGBScheme').value=level.gb.scheme||'dmg';
   document.getElementById('edGBPx').value=level.gb.px||5;
+  document.getElementById('edGBCurve').value=level.gb.curve||1;
+  document.getElementById('edGBCurveVal').textContent=(level.gb.curve||1).toFixed(2);
   document.getElementById('edGBPixelate').checked=(level.gb.pixelate!==false);
   document.getElementById('edGBPlayer').value=((level.gb.player===1||level.gb.player===true)?'full':String(level.gb.player||'0')).replace('*','');
   document.getElementById('edGBPlayerPx').checked=String(level.gb.player||'').endsWith('*');
@@ -3570,7 +3578,7 @@ function renderPlay(t){
   if(G.player&&!G.over){const _pa=G.player,_pulse=0.15+Math.sin(t*2)*0.05;const _ag=ctx.createRadialGradient(_pa.x,_pa.y+10,0,_pa.x,_pa.y+10,34);_ag.addColorStop(0,'rgba(190,160,255,'+_pulse+')');_ag.addColorStop(1,'rgba(190,160,255,0)');ctx.save();ctx.fillStyle=_ag;ctx.beginPath();ctx.ellipse(_pa.x,_pa.y+10,34,20,0,0,TAU);ctx.fill();ctx.restore();}
   drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid});
   for(const to of curTorches())drawTorchAt(to,t);
-  if(G.gb&&G.gb.on){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors); else applyColorClamp(G.gb.scheme,G.gb.colors); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
+  if(G.gb&&G.gb.on){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.curve); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.curve); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
   applyLighting(t);
   if(G.gb&&G.gb.on) drawGbPops(t,false);
   { const P=G.player;
@@ -3731,8 +3739,8 @@ function renderEditor(t){
   }
   const _lit=(ed.lightPreview&&(level.ambient||0)>0);
   if(level.gb&&level.gb.on){
-    if(level.gb.pixelate!==false) applyGameBoy(level.gb.px,level.gb.scheme,level.gb.colors);
-    else applyColorClamp(level.gb.scheme,level.gb.colors);
+    if(level.gb.pixelate!==false) applyGameBoy(level.gb.px,level.gb.scheme,level.gb.colors,level.gb.curve);
+    else applyColorClamp(level.gb.scheme,level.gb.colors,level.gb.curve);
     ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom);
   }
   if(_lit){ applyLighting(t,ed.cam.x,ed.cam.y,ed.zoom); ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom); }
