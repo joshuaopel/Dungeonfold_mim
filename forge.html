@@ -1228,8 +1228,8 @@ let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
 let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
 // Combined GB palette + lightmap pass. Call buildLightmap() first when ambient>0.
-// lightLum*(n-1) maps light level continuously to palette stop (no discrete rings).
-// (texLum-0.5)*2*lightLum adds up to ±1 stop texture variation scaled by light.
+// rawL² power curve keeps ambient dim while letting torches punch to full brightness.
+// lightLum*(n-1) maps continuously to palette stop; texLum adds ±1 stop variation.
 // At lightLum=0 result is always 0 → PAL[0] (full darkness = darkest color).
 function applyGameBoyLit(px,scheme,colors,pixelate){
   try{
@@ -1258,7 +1258,8 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
         const texLum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
         let c;
         if(ld){
-          const lightLum=(ld[i]*0.299+ld[i+1]*0.587+ld[i+2]*0.114)/255;
+          const rawL=(ld[i]*0.299+ld[i+1]*0.587+ld[i+2]*0.114)/255;
+          const lightLum=rawL*rawL; // power-2 curve: ambient stays dim, torches punch bright
           c=PAL[Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)))];
         }else{
           c=PAL[gbLevel(texLum,n)];
@@ -1285,7 +1286,8 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
         let s;
         if(ld){
           const li=i*4;
-          const lightLum=(ld[li]*0.299+ld[li+1]*0.587+ld[li+2]*0.114)/255;
+          const rawL=(ld[li]*0.299+ld[li+1]*0.587+ld[li+2]*0.114)/255;
+          const lightLum=rawL*rawL;
           s=Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)));
         }else{
           s=gbLevel(texLum,n);
