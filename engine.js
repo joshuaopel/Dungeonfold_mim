@@ -887,6 +887,40 @@ const GB_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 function gbLevel(lum,n){ n=n||4; const l=Math.floor(lum*n); return l<0?0:l>=n?n-1:l; }
 let gbBuf=null,gbCtx=null;
 let _gbLo=0,_gbHi=1; // temporally-smoothed luminance range for auto-contrast (stops palette clustering in the mid-tones)
+// Reusable 256-entry dark->light colour lookup table. Both the palette and ramp-image
+// paths fill this, so the per-pixel hot loop is a single indexed lookup.
+let _lutBytes=new Uint8ClampedArray(256*4), _lutU32=new Uint32Array(_lutBytes.buffer);
+// Ramp-image LUT, built asynchronously from a data URL. _rampKey tracks which URL it was
+// built from; the editor sets _rampKey=null to force a rebuild when the ramp changes.
+let _rampKey=null,_rampU32=null,_rampBytes=null,_rampLoading=null;
+function rampLut(dataURL){
+  if(!dataURL)return null;
+  if(_rampKey===dataURL&&_rampU32)return {bytes:_rampBytes,u32:_rampU32};
+  if(_rampLoading!==dataURL){
+    _rampLoading=dataURL;
+    try{
+      const im=new Image();
+      im.onload=()=>{ try{
+        const c=document.createElement('canvas'); c.width=256; c.height=1;
+        const cx=c.getContext('2d',{willReadFrequently:true}); cx.imageSmoothingEnabled=true;
+        cx.drawImage(im,0,0,256,1);                       // resample the strip's gradient to 256 stops
+        const id=cx.getImageData(0,0,256,1);
+        _rampBytes=id.data; _rampU32=new Uint32Array(id.data.buffer); _rampKey=dataURL;
+      }catch(e){ _rampU32=null; } _rampLoading=null; };
+      im.onerror=()=>{ _rampLoading=null; };
+      im.src=dataURL;
+    }catch(e){ _rampLoading=null; }
+  }
+  return (_rampKey===dataURL&&_rampU32)?{bytes:_rampBytes,u32:_rampU32}:null;
+}
+// Returns a 256-entry LUT ({bytes,u32}) mapping normalised luminance 0..255 to colour.
+function buildGbLut(scheme,colors,ramp){
+  if(scheme==='ramp'){ const r=rampLut(ramp); if(r)return r; } // not loaded yet -> fall through to palette
+  const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
+  const n=PAL.length;
+  for(let k=0;k<256;k++){ const c=PAL[gbLevel(k/255,n)],o=k<<2; _lutBytes[o]=c[0]; _lutBytes[o+1]=c[1]; _lutBytes[o+2]=c[2]; _lutBytes[o+3]=255; }
+  return {bytes:_lutBytes,u32:_lutU32};
+}
 let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
 let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
@@ -964,7 +998,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
   }catch(e){}
 }
 
-function applyGameBoy(px,scheme,colors){
+function applyGameBoy(px,scheme,colors,ramp){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -975,12 +1009,11 @@ function applyGameBoy(px,scheme,colors){
     gbCtx.clearRect(0,0,lowW,lowH);
     gbCtx.drawImage(cv,0,0,vw,vh,0,0,lowW,lowH);
     if(scheme!=='native'){            // 'native' = pixelize only, keep current textures/colors
-      const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
-      const n=PAL.length;
+      const lb=buildGbLut(scheme,colors,ramp).bytes;
       const img=gbCtx.getImageData(0,0,lowW,lowH), d=img.data;
       const N=lowW*lowH;
       // Single pass: auto-contrast using LAST frame's smoothed range (mapping the full
-      // palette across the scene's luminance), while measuring THIS frame's range for next
+      // ramp across the scene's luminance), while measuring THIS frame's range for next
       // frame. 1-frame latency is invisible and avoids a second full-buffer pass.
       const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
       let lo=1,hi=0;
@@ -988,8 +1021,9 @@ function applyGameBoy(px,scheme,colors){
         const i=p*4;
         const raw=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
         if(raw<lo)lo=raw; if(raw>hi)hi=raw;
-        const c=PAL[gbLevel((raw-base)/span,n)];
-        d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
+        let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
+        const o=idx<<2;
+        d[i]=lb[o]; d[i+1]=lb[o+1]; d[i+2]=lb[o+2]; d[i+3]=255;
       }
       _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       gbCtx.putImageData(img,0,0);
@@ -1000,19 +1034,15 @@ function applyGameBoy(px,scheme,colors){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors){
+function applyColorClamp(scheme,colors,ramp){
   try{
     if(scheme==='native')return;
-    const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
     if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
     if(!gbCtx||!gbCtx.getImageData)return;
     if(gbBuf.width!==vw||gbBuf.height!==vh){ gbBuf.width=vw; gbBuf.height=vh; }
     gbCtx.drawImage(cv,0,0);
     const img=gbCtx.getImageData(0,0,vw,vh);
-    const n=PAL.length;
-    // Pre-pack palette as little-endian ABGR (matches canvas Uint32 layout: R|G<<8|B<<16|A<<24)
-    const packed=new Uint32Array(n);
-    for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
+    const lu=buildGbLut(scheme,colors,ramp).u32;   // 256-entry dark->light LUT in native canvas byte order
     const d32=new Uint32Array(img.data.buffer);
     const len=d32.length;
     // Single pass: auto-contrast with last frame's smoothed range while measuring this
@@ -1023,7 +1053,8 @@ function applyColorClamp(scheme,colors){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
       const raw=(299*r+587*g+114*b)/255000;
       if(raw<lo)lo=raw; if(raw>hi)hi=raw;
-      d32[i]=packed[gbLevel((raw-base)/span,n)];
+      let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
+      d32[i]=lu[idx];
     }
     _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     gbCtx.putImageData(img,0,0);
