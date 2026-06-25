@@ -964,7 +964,7 @@ function applyGameBoyLit(px,scheme,colors,pixelate){
   }catch(e){}
 }
 
-function applyGameBoy(px,scheme,colors,curve){
+function applyGameBoy(px,scheme,colors){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -979,21 +979,19 @@ function applyGameBoy(px,scheme,colors,curve){
       const n=PAL.length;
       const img=gbCtx.getImageData(0,0,lowW,lowH), d=img.data;
       const N=lowW*lowH;
-      // Pass 1: find the scene's actual luminance range so the full palette is used,
-      // not just the few mid-tone stops a low-contrast sprite would otherwise hit.
-      let lo=1,hi=0;
-      for(let p=0;p<N;p++){ const i=p*4; const L=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255; if(L<lo)lo=L; if(L>hi)hi=L; }
-      _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
+      // Single pass: auto-contrast using LAST frame's smoothed range (mapping the full
+      // palette across the scene's luminance), while measuring THIS frame's range for next
+      // frame. 1-frame latency is invisible and avoids a second full-buffer pass.
       const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
-      // Pass 2: stretch to [0,1], apply gamma curve, then map deterministically.
-      const gamma=Math.max(0.1,curve||1);
+      let lo=1,hi=0;
       for(let p=0;p<N;p++){
         const i=p*4;
-        let L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
-        if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
-        const c=PAL[gbLevel(L,n)];
+        const raw=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+        if(raw<lo)lo=raw; if(raw>hi)hi=raw;
+        const c=PAL[gbLevel((raw-base)/span,n)];
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
+      _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       gbCtx.putImageData(img,0,0);
     }
     ctx.setTransform(1,0,0,1,0,0);
@@ -1002,7 +1000,7 @@ function applyGameBoy(px,scheme,colors,curve){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors,curve){
+function applyColorClamp(scheme,colors){
   try{
     if(scheme==='native')return;
     const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
@@ -1017,18 +1015,17 @@ function applyColorClamp(scheme,colors,curve){
     for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
     const d32=new Uint32Array(img.data.buffer);
     const len=d32.length;
-    // Pass 1: scene luminance range -> auto-contrast so the full palette is used.
-    let lo=1,hi=0;
-    for(let i=0;i<len;i++){ const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF; const L=(299*r+587*g+114*b)/255000; if(L<lo)lo=L; if(L>hi)hi=L; }
-    _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
+    // Single pass: auto-contrast with last frame's smoothed range while measuring this
+    // frame's range for next frame (avoids a second full-resolution pass).
     const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
-    const gamma=Math.max(0.1,curve||1);
+    let lo=1,hi=0;
     for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      let L=((299*r+587*g+114*b)/255000-base)/span;
-      if(gamma!==1)L=Math.pow(Math.max(0,Math.min(1,L)),gamma);
-      d32[i]=packed[gbLevel(L,n)];
+      const raw=(299*r+587*g+114*b)/255000;
+      if(raw<lo)lo=raw; if(raw>hi)hi=raw;
+      d32[i]=packed[gbLevel((raw-base)/span,n)];
     }
+    _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     gbCtx.putImageData(img,0,0);
     ctx.setTransform(1,0,0,1,0,0);
     ctx.drawImage(gbBuf,0,0);
