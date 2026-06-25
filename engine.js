@@ -886,6 +886,7 @@ const GB_SCHEMES={
 const GB_BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 function gbLevel(lum,n){ n=n||4; const l=Math.floor(lum*n); return l<0?0:l>=n?n-1:l; }
 let gbBuf=null,gbCtx=null;
+let _gbLo=0,_gbHi=1; // temporally-smoothed luminance range for auto-contrast (stops palette clustering in the mid-tones)
 let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
 let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
@@ -977,11 +978,18 @@ function applyGameBoy(px,scheme,colors){
       const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
       const n=PAL.length;
       const img=gbCtx.getImageData(0,0,lowW,lowH), d=img.data;
-      for(let y=0;y<lowH;y++)for(let x=0;x<lowW;x++){
-        const i=(y*lowW+x)*4;
-        let lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-        lum+=((GB_BAYER[y&3][x&3]+0.5)/16-0.5)*0.16;
-        const c=PAL[gbLevel(lum,n)];
+      const N=lowW*lowH;
+      // Pass 1: find the scene's actual luminance range so the full palette is used,
+      // not just the few mid-tone stops a low-contrast sprite would otherwise hit.
+      let lo=1,hi=0;
+      for(let p=0;p<N;p++){ const i=p*4; const L=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255; if(L<lo)lo=L; if(L>hi)hi=L; }
+      _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
+      const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+      // Pass 2: stretch to [0,1], then map deterministically (no dither -> same source value = same color).
+      for(let p=0;p<N;p++){
+        const i=p*4;
+        const L=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255-base)/span;
+        const c=PAL[gbLevel(L,n)];
         d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
       }
       gbCtx.putImageData(img,0,0);
@@ -1006,10 +1014,16 @@ function applyColorClamp(scheme,colors){
     const packed=new Uint32Array(n);
     for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
     const d32=new Uint32Array(img.data.buffer);
-    for(let i=0,len=d32.length;i<len;i++){
+    const len=d32.length;
+    // Pass 1: scene luminance range -> auto-contrast so the full palette is used.
+    let lo=1,hi=0;
+    for(let i=0;i<len;i++){ const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF; const L=(299*r+587*g+114*b)/255000; if(L<lo)lo=L; if(L>hi)hi=L; }
+    _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
+    const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+    for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      const lum=(299*r+587*g+114*b)/255000;
-      d32[i]=packed[gbLevel(lum,n)];
+      const L=((299*r+587*g+114*b)/255000-base)/span;
+      d32[i]=packed[gbLevel(L,n)];
     }
     gbCtx.putImageData(img,0,0);
     ctx.setTransform(1,0,0,1,0,0);
