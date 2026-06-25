@@ -231,8 +231,10 @@ const INTER_KINDS={door:1,plate:1,lever:1,trap:1,hint:1};
 const INTER_TILED={door:1,plate:1,trap:1};
 const TOOL_INTER={iDoor:'door',iPlate:'plate',iLever:'lever',iTrap:'trap',iHint:'hint'};
 let doorBlock={};
+let propBlock={};            // tiles occupied by pushable props — blocks heroes, not the player (player uses circle push)
 const tileKey=(c,r)=>c+','+r;
-const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];
+const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r]&&!propBlock[c+','+r];
+const walkTileNP=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];  // ignores pushable props (for player + the props themselves)
 const interTile=it=>({c:Math.floor(it.x/TS),r:Math.floor(it.y/TS)});
 function drawInter(it,st){
   if(it.kind==='hint'){
@@ -365,12 +367,14 @@ function drawObjInst(o){
 }
 function drawObjects(){ for(const o of (level.objects||[])) drawObjInst(o); }
 function updateInter(dt){
+  propBlock={};
+  if(G.props)for(const _pr of G.props){ if(_pr.push) propBlock[Math.floor(_pr.x/TS)+','+Math.floor(_pr.y/TS)]=1; }
   const bodies=[G.player,...G.heroes];
   const act={};
   for(const it of G.inter){
     if(it.kind==='plate'){
       const tl=interTile(it),was=it.active;
-      it.active=bodies.some(b=>Math.floor(b.x/TS)===tl.c&&Math.floor(b.y/TS)===tl.r);
+      it.active=bodies.some(b=>Math.floor(b.x/TS)===tl.c&&Math.floor(b.y/TS)===tl.r)||(!!G.props&&G.props.some(pr=>pr.push&&Math.floor(pr.x/TS)===tl.c&&Math.floor(pr.y/TS)===tl.r));
       if(it.active&&!was)sfx('click');
     } else if(it.kind==='lever'){
       it.active=!!it.flip;
@@ -408,6 +412,37 @@ function updateInter(dt){
   }
 }
 
+/* ---- pushable props: Mim can shove a prop in a direction (puzzle plates / blockers) ---- */
+const PUSH_R=15;
+function blockOtherProps(pr){
+  for(const o of G.props){
+    if(o===pr||!o.push)continue;
+    const dx=pr.x-o.x,dy=pr.y-o.y;let d=Math.hypot(dx,dy);
+    const md=(pr.r||PUSH_R)+(o.r||PUSH_R);
+    if(d>0&&d<md){ pr.x=o.x+dx/d*md; pr.y=o.y+dy/d*md; }
+  }
+}
+function resolvePush(p){
+  if(!G||!G.props)return;
+  for(const pr of G.props){
+    if(!pr.push)continue;
+    if(pr.r==null)pr.r=PUSH_R;
+    let dx=pr.x-p.x,dy=pr.y-p.y,d=Math.hypot(dx,dy);
+    const minD=(p.r||16)+pr.r;
+    if(d>=minD)continue;
+    if(d<0.0001){ dx=Math.cos(p.face||0); dy=Math.sin(p.face||0); d=1; }   // perfectly overlapped — shove along facing
+    const nx=dx/d,ny=dy/d;
+    pr.x+=nx*(minD-d); pr.y+=ny*(minD-d);    // slide the prop out along the contact axis
+    collideTiles(pr,walkTileNP);             // keep it out of walls / doors / solid objects
+    blockOtherProps(pr);                     // don't let it overlap another pushable prop
+    const nd=Math.hypot(pr.x-p.x,pr.y-p.y);
+    if(nd<minD-0.5){                          // prop couldn't clear (wall behind it) — block the player instead
+      const cd=nd||1;
+      p.x=pr.x-(pr.x-p.x)/cd*minD;
+      p.y=pr.y-(pr.y-p.y)/cd*minD;
+    }
+  }
+}
 const DECAL_KINDS={rubble:1,bones:1,puddle:1,cobweb:1,mushrooms:1,crack:1,banner:1,chain:1,coins:1,moss:1};
 const TOOL_DECAL={dRubble:'rubble',dBones:'bones',dPuddle:'puddle',dCobweb:'cobweb',dMushroom:'mushrooms',dCrack:'crack',dBanner:'banner',dChain:'chain',dCoins:'coins',dMoss:'moss'};
 let level=null;
@@ -626,6 +661,12 @@ function drawPropAt(kind,x,y,t,isPlayer,inst){
   ctx.save();ctx.translate(x,y);
   shadowAt(kind==='statue'?22:16);
   ctx.restore();
+  if(inst&&inst.push&&!isPlayer){          // faint dashed base ring marks a prop Mim can push
+    ctx.save();ctx.translate(x,y+15);ctx.globalAlpha=0.45;
+    ctx.strokeStyle='rgba(150,205,255,0.9)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.ellipse(0,0,19,8,0,0,TAU);ctx.stroke();
+    ctx.restore();
+  }
   let fx=null;
   if(isPlayer&&G){
     const mode=G.player.sneak?'sneak':(G.player.moving?'walk':'idle');
