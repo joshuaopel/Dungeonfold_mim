@@ -2627,7 +2627,7 @@ function edDown(wx,wy,button){
     return 'pan';
   }
   if(ed.tool==='pan') return 'pan';
-  if(TOOL_TILE[ed.tool]!==undefined){
+  if(TOOL_TILE[ed.tool]!==undefined||(typeof ed.tool==='string'&&ed.tool.indexOf('ct:')===0)){
     pushUndo(); ed.painting=true;
     applyTool(wx,wy,false); return;
   }
@@ -3899,7 +3899,7 @@ function renderEditor(t){
   }
   if(ed.hoverW&&!ed.panning&&!ed.drag){
     const c=Math.floor(ed.hoverW.x/TS),r=Math.floor(ed.hoverW.y/TS);
-    if(TOOL_TILE[ed.tool]!==undefined||ed.tool==='erase'){
+    if(TOOL_TILE[ed.tool]!==undefined||ed.tool==='erase'||(typeof ed.tool==='string'&&ed.tool.indexOf('ct:')===0)){
       ctx.fillStyle=ed.tool==='erase'?'rgba(232,84,84,0.25)':'rgba(245,200,76,0.18)';
       ctx.fillRect(c*TS,r*TS,TS,TS);
     } else if(ed.tool!=='pan'&&ed.tool!=='select'){
