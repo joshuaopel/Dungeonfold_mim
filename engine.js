@@ -808,7 +808,8 @@ let lightCanvas=null,lightCtx=null;
 function buildLightmap(t,camX,camY,zoom){
   _lightmapReady=false;
   const amb=(level.ambient==null?0:level.ambient);
-  if(amb<=0)return false;
+  const zones=level.ambientZones&&level.ambientZones.length?level.ambientZones:null;
+  if(amb<=0&&!zones)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
   if(!lightCanvas)lightCanvas=document.createElement('canvas');
   if(!lightCtx||lightCanvas.width!==vw||lightCanvas.height!==vh){lightCanvas.width=vw;lightCanvas.height=vh;lightCtx=lightCanvas.getContext('2d');}
@@ -816,8 +817,16 @@ function buildLightmap(t,camX,camY,zoom){
   lx.setTransform(1,0,0,1,0,0);
   lx.globalCompositeOperation='source-over';
   const base=Math.round(255*(1-amb));
-  lx.fillStyle='rgb('+base+','+Math.round(base*0.9)+','+Math.min(255,Math.round(base*1.08))+')';
+  lx.fillStyle=amb>0?'rgb('+base+','+Math.round(base*0.9)+','+Math.min(255,Math.round(base*1.08))+')':'rgb(0,0,0)';
   lx.fillRect(0,0,vw,vh);
+  if(zones){
+    for(const z of zones){
+      const zAmb=clamp(z.ambient==null?amb:z.ambient,0,1);
+      const zb=Math.round(255*(1-zAmb));
+      lx.fillStyle='rgb('+zb+','+Math.round(zb*0.9)+','+Math.min(255,Math.round(zb*1.08))+')';
+      lx.fillRect((z.x-camX)*zoom,(z.y-camY)*zoom,z.w*zoom,z.h*zoom);
+    }
+  }
   lx.globalCompositeOperation='lighter';
   const addLight=(wx,wy,r,cr,cg,cb,inten)=>{
     const sx=(wx-camX)*zoom,sy=(wy-camY)*zoom,R=r*zoom;
