@@ -1147,8 +1147,7 @@ let lightCanvas=null,lightCtx=null;
 function buildLightmap(t,camX,camY,zoom){
   _lightmapReady=false;
   const amb=(level.ambient==null?0:level.ambient);
-  const zones=level.ambientZones&&level.ambientZones.length?level.ambientZones:null;
-  if(amb<=0&&!zones)return false;
+  if(amb<=0)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
   if(!lightCanvas)lightCanvas=document.createElement('canvas');
   if(!lightCtx||lightCanvas.width!==vw||lightCanvas.height!==vh){lightCanvas.width=vw;lightCanvas.height=vh;lightCtx=lightCanvas.getContext('2d');}
@@ -1156,16 +1155,8 @@ function buildLightmap(t,camX,camY,zoom){
   lx.setTransform(1,0,0,1,0,0);
   lx.globalCompositeOperation='source-over';
   const base=Math.round(255*(1-amb));
-  lx.fillStyle=amb>0?'rgb('+base+','+Math.round(base*0.9)+','+Math.min(255,Math.round(base*1.08))+')':'rgb(0,0,0)';
+  lx.fillStyle='rgb('+base+','+Math.round(base*0.9)+','+Math.min(255,Math.round(base*1.08))+')';
   lx.fillRect(0,0,vw,vh);
-  if(zones){
-    for(const z of zones){
-      const zAmb=clamp(z.ambient==null?amb:z.ambient,0,1);
-      const zb=Math.round(255*(1-zAmb));
-      lx.fillStyle='rgb('+zb+','+Math.round(zb*0.9)+','+Math.min(255,Math.round(zb*1.08))+')';
-      lx.fillRect((z.x-camX)*zoom,(z.y-camY)*zoom,z.w*zoom,z.h*zoom);
-    }
-  }
   lx.globalCompositeOperation='lighter';
   const addLight=(wx,wy,r,cr,cg,cb,inten)=>{
     const sx=(wx-camX)*zoom,sy=(wy-camY)*zoom,R=r*zoom;
@@ -1683,7 +1674,7 @@ function blankLevel(cols,rows){
   return { name:'My Dungeon', cols, rows, goal:15, blurb:'', author:'', music:null, musicName:'', v:2, intro:[], outro:[], assets:{}, aidn:0, ambient:0.5, objDefs:[], objects:[], odn:0, mode:'heist', enemyDefs:[], endn:0, gb:{on:false,scheme:'dmg',px:5,player:0},
     tiles:new Array(cols*rows).fill(0),
     spawn:{x:TS*2.5,y:TS*2.5}, portal:{x:TS*(cols-2.5),y:TS*(rows-2.5)},
-    props:[], treasures:[], heroes:[], torches:[], decals:[], inter:[], links:[], iid:1, art:{}, triggers:[], keys:[], ambientZones:[],
+    props:[], treasures:[], heroes:[], torches:[], decals:[], inter:[], links:[], iid:1, art:{}, triggers:[], keys:[],
     customTiles:[], tileLabels:{} };
 }
 const setT=(lv,c,r,v)=>{ if(c>=0&&r>=0&&c<lv.cols&&r<lv.rows) lv.tiles[r*lv.cols+c]=v; };
@@ -2041,7 +2032,6 @@ function applySnap(s){
   level.objDefs=odefs||[];level.objects=level.objects||[];
   level.decals=level.decals||[];
   level.inter=level.inter||[];level.links=level.links||[];level.iid=level.iid||1;
-  level.ambientZones=level.ambientZones||[];
   level.customTiles=level.customTiles||[];level.tileLabels=level.tileLabels||{};
   ed.sel=null; ed.selHero=null; ed.drag=null;
   syncCustomTiles(); buildTileCache(); buildPalette();
@@ -2106,7 +2096,6 @@ const TOOLS=[
   ['wallMoss','Mossy','#41545c'],['wallDark','Obsidian','#2e2244'],
   ['h4','Markers'],
   ['spawn','Spawn','#9b5fd0'],['portal','Portal','#5ee0c8'],['torch','Torch','#ff9d3b'],['beacon','Beacon ✦','#5ee0c8'],
-  ['ambZone','Ambient zone','#1a6baf'],
   ['h4','Treasure'],
   ['gold','Gold','#f5c84c'],['gem','Gem','#5ee0c8'],['artifact','Artifact','#ff7ad9'],
   ['h4','Props (disguises)'],
@@ -2210,7 +2199,6 @@ function setTool(t){
   if(t!=='waypoint') ed.selHero=null;
   if(t!=='iLink') ed.linkFrom=null;
   if(t!=='select'){ ed.sel=null; ed.drag=null; }
-  if(t!=='ambZone') ed.ambZoneDraw=null;
   document.querySelectorAll('.tool').forEach(el=>el.classList.toggle('active',el.dataset.tool===t));
   { const act=document.querySelector('.tool.active'); if(act&&act.closest){ const sec=act.closest('.palSec'); if(sec&&sec.classList&&sec.classList.contains('collapsed')){ const nm=sec.querySelector&&sec.querySelector('.palHead span:nth-child(2)'); sec.classList.remove('collapsed'); if(nm&&palCollapsed)palCollapsed.delete(nm.textContent); } } }
   if(typeof t==='string'&&t.indexOf('obj:')===0){const _d=objDefById(t.slice(4));document.getElementById('editorHint').textContent='Stamping "'+((_d&&_d.name)||'object')+'". Click the map to place'+((_d&&_d.snap)?' (snaps to grid)':'')+'. Switch to Select to move or delete copies.';return;}
@@ -2240,7 +2228,6 @@ function setTool(t){
     iHint:'Click to drop a hint sign. Select it to type the text and choose Label (always shown) or Popup (fades in when the Mimic is near). Wire a plate/lever to it with Link to make it pop on cue.',
     iLink:'Click a plate or lever, then a door, trap, or hint, to wire them (same pair again unlinks). For doors/traps an active trigger INVERTS the start state; for hints it pops the message.',
     waypoint:'Click to add patrol points for the selected hero. Right-click the hero to clear its path. Esc to finish.',
-    ambZone:'Drag to draw an ambient light zone. Select it to adjust local brightness independently of the global ambient setting.',
   };
   document.getElementById('editorHint').textContent=hints[t]||(TOOL_TILE[t]!==undefined?(isFloorT(TOOL_TILE[t])?'Left-drag to paint this floor. Mix floor types to break up large rooms.':'Left-drag to paint this wall. All walls block movement and sight.'):(TOOL_DECAL[t]?'Click to place a cosmetic '+TOOL_DECAL[t]+' (random tilt & flip). Move or remove it with Select. No gameplay effect.':''));
 }
@@ -2268,12 +2255,6 @@ function hitTest(wx,wy){
   const tc=Math.floor(wx/TS),tr=Math.floor(wy/TS);
   const trig=(level.triggers||[]).find(t=>t.c===tc&&t.r===tr);
   if(trig) return {type:'trigger',ref:trig};
-  const azArr=level.ambientZones||[];
-  for(let i=azArr.length-1;i>=0;i--){
-    const z=azArr[i];
-    if(wx>=z.x&&wx<=z.x+z.w&&wy>=z.y&&wy<=z.y+z.h)
-      return {type:'ambZone',ref:z,arr:azArr,i};
-  }
   return null;
 }
 function pruneAssets(){
@@ -2324,14 +2305,6 @@ function renderSelProps(s,pool){
     cb.onchange=()=>{ pushUndo(); set(cb.checked); };
     l.append(cb,document.createTextNode(label)); r.appendChild(l); row.appendChild(r);
   };
-  if(pool==='ambZone'){
-    any=true;
-    const z=ed.sel&&ed.sel.ref;
-    if(!z){row.style.display='none';return;}
-    slider('Ambient',()=>(z.ambient==null?0.7:z.ambient),v=>{z.ambient=v;},0,100,100,v=>Math.round(v*100)+'%');
-    row.style.display='';
-    return;
-  }
   if(pool==='keys'){
     any=true;
     const k=ed.sel&&ed.sel.ref;
@@ -2433,19 +2406,6 @@ function refreshSelPanel(){
     document.getElementById('selArtClr').style.display='none';
     document.getElementById('selHintRow').style.display='none';
     renderSelProps(null,'triggers');
-    return;
-  }
-  if(ed.sel&&ed.sel.type==='ambZone'){
-    const z=ed.sel.ref;
-    if(z===ed._lastSel){p.classList.remove('hidden');return;}
-    ed._lastSel=z;
-    p.classList.remove('hidden');
-    ['libPanel','enemyPanel','artPanel','storyPanel'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
-    document.getElementById('selLabel').textContent='Ambient zone';
-    document.getElementById('selArtRow').style.display='none';
-    document.getElementById('selArtClr').style.display='none';
-    document.getElementById('selHintRow').style.display='none';
-    renderSelProps(null,'ambZone');
     return;
   }
   const s=(MODE==='editor')?selRef():null;
@@ -2638,7 +2598,6 @@ function deleteSel(){
   if(!ed.sel) return;
   if(ed.sel.type==='waypoint'){ pushUndo(); ed.sel.hero.path.splice(ed.sel.i,1); ed.sel=null; }
   else if(ed.sel.type==='trigger'){ pushUndo(); const i=level.triggers.indexOf(ed.sel.ref); if(i>=0)level.triggers.splice(i,1); ed.sel=null; }
-  else if(ed.sel.type==='ambZone'){ pushUndo(); const i=(level.ambientZones||[]).indexOf(ed.sel.ref); if(i>=0)level.ambientZones.splice(i,1); ed.sel=null; }
   else if(ed.sel.type==='entity'){ pushUndo(); const i=ed.sel.arr.indexOf(ed.sel.ref); if(i>=0)ed.sel.arr.splice(i,1); ed.sel=null; pruneLinks(); }
 }
 
@@ -2649,7 +2608,6 @@ function edDown(wx,wy,button){
     const hit=hitTest(wx,wy);
     if(hit&&hit.type==='waypoint'){ pushUndo(); hit.hero.path.splice(hit.i,1); return; }
     if(hit&&hit.type==='trigger'){ pushUndo(); const i=level.triggers.indexOf(hit.ref); if(i>=0)level.triggers.splice(i,1); if(ed.sel&&ed.sel.ref===hit.ref)ed.sel=null; return; }
-    if(hit&&hit.type==='ambZone'){ pushUndo(); const i=(level.ambientZones||[]).indexOf(hit.ref); if(i>=0)level.ambientZones.splice(i,1); if(ed.sel&&ed.sel.ref===hit.ref)ed.sel=null; return; }
     if(hit&&hit.type==='entity'){ pushUndo(); const i=hit.arr.indexOf(hit.ref); if(i>=0)hit.arr.splice(i,1); if(ed.selHero===hit.ref)ed.selHero=null; if(ed.sel&&ed.sel.ref===hit.ref)ed.sel=null; pruneLinks(); return; }
     ed.erasing=true; ed.strokeUndoPushed=false;
     edEraseTile(wx,wy);
@@ -2669,7 +2627,6 @@ function edDown(wx,wy,button){
     return 'pan';
   }
   if(ed.tool==='pan') return 'pan';
-  if(ed.tool==='ambZone'){ ed.ambZoneDraw={x0:wx,y0:wy,x1:wx,y1:wy}; return; }
   if(TOOL_TILE[ed.tool]!==undefined){
     pushUndo(); ed.painting=true;
     applyTool(wx,wy,false); return;
@@ -2683,7 +2640,6 @@ function edDown(wx,wy,button){
 }
 function edMove(wx,wy){
   ed.hoverW={x:wx,y:wy};
-  if(ed.ambZoneDraw){ed.ambZoneDraw.x1=wx;ed.ambZoneDraw.y1=wy;}
   if(ed.drag){
     ed.drag.ref.x=wx+ed.drag.dx; ed.drag.ref.y=wy+ed.drag.dy;
     if(ed.drag.snapTile){
@@ -2695,18 +2651,7 @@ function edMove(wx,wy){
   if(ed.painting) applyTool(wx,wy,true);
   if(ed.erasing) edEraseTile(wx,wy);
 }
-function edUp(){
-  ed.painting=false; ed.erasing=false; ed.drag=null;
-  if(ed.ambZoneDraw){
-    const {x0,y0,x1,y1}=ed.ambZoneDraw; ed.ambZoneDraw=null;
-    const x=Math.min(x0,x1),y=Math.min(y0,y1),w=Math.abs(x1-x0),h=Math.abs(y1-y0);
-    if(w>10&&h>10){
-      pushUndo();
-      level.ambientZones=level.ambientZones||[];
-      level.ambientZones.push({x,y,w,h,ambient:0.7,id:level.iid++});
-    }
-  }
-}
+function edUp(){ ed.painting=false; ed.erasing=false; ed.drag=null; }
 function edEraseTile(wx,wy){
   if(!ed.strokeUndoPushed){ pushUndo(); ed.strokeUndoPushed=true; }
   setT(level,Math.floor(wx/TS),Math.floor(wy/TS),0);
@@ -3824,35 +3769,6 @@ function renderEditor(t){
   ctx.fillStyle='#0a0613';ctx.fillRect(0,0,vw,vh);
   ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom);
   drawTiles(ed.cam.x,ed.cam.y,ed.zoom);
-  if(level.ambientZones&&level.ambientZones.length){
-    ctx.save();
-    for(const z of level.ambientZones){
-      const sel=ed.sel&&ed.sel.type==='ambZone'&&ed.sel.ref===z;
-      ctx.fillStyle=sel?'rgba(40,130,220,0.28)':'rgba(30,110,200,0.14)';
-      ctx.fillRect(z.x,z.y,z.w,z.h);
-      ctx.strokeStyle=sel?'rgba(80,180,255,0.9)':'rgba(60,150,230,0.5)';
-      ctx.lineWidth=(sel?2:1.5)/ed.zoom;
-      ctx.setLineDash([6/ed.zoom,3/ed.zoom]);
-      ctx.strokeRect(z.x,z.y,z.w,z.h);
-      ctx.setLineDash([]);
-      const pct=Math.round((z.ambient==null?0.7:z.ambient)*100)+'%';
-      ctx.fillStyle='rgba(140,210,255,0.9)';
-      ctx.font='bold '+(11/ed.zoom)+'px Nunito';
-      ctx.textAlign='left';ctx.textBaseline='top';
-      ctx.fillText('amb '+pct,z.x+4/ed.zoom,z.y+4/ed.zoom);
-    }
-    ctx.textAlign='start';ctx.textBaseline='alphabetic';
-    ctx.restore();
-  }
-  if(ed.ambZoneDraw){
-    const {x0,y0,x1,y1}=ed.ambZoneDraw;
-    const zx=Math.min(x0,x1),zy=Math.min(y0,y1),zw=Math.abs(x1-x0),zh=Math.abs(y1-y0);
-    ctx.fillStyle='rgba(40,130,220,0.2)';ctx.fillRect(zx,zy,zw,zh);
-    ctx.strokeStyle='rgba(80,180,255,0.8)';ctx.lineWidth=2/ed.zoom;
-    ctx.setLineDash([5/ed.zoom,3/ed.zoom]);
-    ctx.strokeRect(zx,zy,zw,zh);
-    ctx.setLineDash([]);
-  }
   if(level.triggers&&level.triggers.length){
     for(const trig of level.triggers){
       const tx=trig.c*TS,ty=trig.r*TS;
@@ -3928,7 +3844,7 @@ function renderEditor(t){
     ctx.arc(h.x,h.y,d.cone.len,-d.cone.fov,d.cone.fov);
     ctx.closePath();ctx.fill();
   }
-  const _lit=(ed.lightPreview&&((level.ambient||0)>0||(level.ambientZones&&level.ambientZones.length>0)));
+  const _lit=(ed.lightPreview&&(level.ambient||0)>0);
   if(level.gb&&level.gb.on){
     if(level.gb.pixelate!==false) applyGameBoy(level.gb.px,level.gb.scheme,level.gb.colors,level.gb.ramp);
     else applyColorClamp(level.gb.scheme,level.gb.colors,level.gb.ramp);
@@ -4036,7 +3952,6 @@ function tryRestoreDraft(){
     if(!(typeof level.music==='string'&&level.music.startsWith('data:audio'))){level.music=null;level.musicName='';}
     level.inter=(level.inter||[]).filter(i=>INTER_KINDS[i.kind]);
     level.links=level.links||[];level.iid=Math.max(1,+level.iid||1);
-    level.ambientZones=(Array.isArray(level.ambientZones)?level.ambientZones:[]).filter(z=>z&&typeof z.x==='number'&&typeof z.y==='number'&&z.w>0&&z.h>0);
     pruneLinks();
     for(const k of ['intro','outro'])
       level[k]=(Array.isArray(level[k])?level[k]:[]).slice(0,12).map(s=>({text:String((s&&s.text)||'').slice(0,300),img:(s&&typeof s.img==='string'&&s.img.startsWith('data:image'))?s.img:null}));
