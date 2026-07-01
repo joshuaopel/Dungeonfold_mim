@@ -1,0 +1,65 @@
+name: Desktop builds (Steam depots + Windows installer)
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sync engine into HTML
+        run: python build_engine.py
+      - run: npm ci --no-audit --no-fund
+      - name: Build Steam depot folder (win-unpacked)
+        run: npm run build:steam-win
+      - name: Build NSIS installer (direct distribution)
+        run: npm run build:win
+      - name: Ensure no steam_appid.txt in depot
+        shell: bash
+        run: |
+          if find dist/win-unpacked -name steam_appid.txt | grep -q .; then
+            echo "steam_appid.txt must not ship in the depot" && exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steam-depot-windows
+          path: dist/win-unpacked/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sync engine into HTML
+        run: python3 build_engine.py
+      - run: npm ci --no-audit --no-fund
+      - name: Build Steam depot folder (linux-unpacked)
+        run: npm run build:steam-linux
+      - name: Ensure no steam_appid.txt in depot
+        run: |
+          if find dist/linux-unpacked -name steam_appid.txt | grep -q .; then
+            echo "steam_appid.txt must not ship in the depot" && exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steam-depot-linux
+          path: dist/linux-unpacked/
+
+  # To automate the Steam upload, add a job here using
+  # game-ci/steam-deploy with STEAM_USERNAME / STEAM_CONFIG_VDF secrets —
+  # see steam/README.md. Until then: download the artifacts, spot-check,
+  # and upload with steamcmd locally.

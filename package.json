@@ -4,8 +4,10 @@
   "description": "Dungeonfolk: Mim's Adventure — stealth puzzle game",
   "main": "electron/main.js",
   "scripts": {
-    "start":     "electron .",
-    "build:win": "electron-builder --win"
+    "start":             "electron .",
+    "build:win":         "electron-builder --win",
+    "build:steam-win":   "electron-builder --win dir",
+    "build:steam-linux": "electron-builder --linux dir"
   },
   "dependencies": {
     "steamworks.js": "^0.3.1"
@@ -17,7 +19,7 @@
   "build": {
     "appId":       "com.dungeonfolk.mimsadventure",
     "productName": "Dungeonfolk Mim's Adventure",
-    "copyright":   "Copyright © 2024",
+    "copyright":   "Copyright © 2026 Joshua Opel",
     "directories": {
       "output": "dist"
     },
@@ -34,6 +36,11 @@
     "win": {
       "target": ["nsis"],
       "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "linux": {
+      "target": ["dir"],
+      "category": "Game",
+      "executableName": "dungeonfolk-mims-adventure"
     },
     "nsis": {
       "oneClick": false,

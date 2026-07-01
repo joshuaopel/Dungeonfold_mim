@@ -1,0 +1,15 @@
+// Linux depot: the entire electron-builder linux-unpacked folder.
+// Produced by: npm run build:steam-linux   →  dist/linux-unpacked/
+"DepotBuild"
+{
+	"DepotID" "482"                      // TODO: your Linux depot ID
+
+	"FileMapping"
+	{
+		"LocalPath" "linux-unpacked\\*"    // relative to ContentRoot (../dist/)
+		"DepotPath" "."
+		"recursive" "1"
+	}
+
+	"FileExclusion" "*steam_appid.txt"
+}

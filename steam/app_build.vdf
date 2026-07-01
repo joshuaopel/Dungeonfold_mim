@@ -1,0 +1,25 @@
+// SteamPipe app build script — consumed by steamcmd's run_app_build.
+// Replace the placeholder IDs with the values from your Steamworks
+// Partner dashboard (App Admin → SteamPipe → Depots).
+//
+// Upload a build:
+//   steamcmd +login <builder_account> +run_app_build ../steam/app_build.vdf +quit
+// (paths inside this file are relative to THIS file's directory)
+"AppBuild"
+{
+	"AppID" "480"                       // TODO: your real App ID (480 = Spacewar test app)
+	"Desc"  "Dungeonfolk: Mim's Adventure" // shown in the Steamworks build list
+
+	// Builds land in the "default" branch only after you press
+	// "Set build live" in Steamworks; use a beta branch for testing:
+	// "SetLive" "beta"
+
+	"ContentRoot" "..\\dist\\"           // electron-builder output (relative to this file)
+	"BuildOutput" "output\\"             // steamcmd logs + chunk cache (gitignored)
+
+	"Depots"
+	{
+		"481" "depot_windows.vdf"          // TODO: your Windows depot ID (usually AppID+1)
+		"482" "depot_linux.vdf"            // TODO: your Linux depot ID   (usually AppID+2)
+	}
+}

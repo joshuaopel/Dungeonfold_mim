@@ -1,0 +1,17 @@
+// Windows depot: the entire electron-builder win-unpacked folder.
+// Produced by: npm run build:steam-win   →  dist/win-unpacked/
+"DepotBuild"
+{
+	"DepotID" "481"                      // TODO: your Windows depot ID
+
+	"FileMapping"
+	{
+		"LocalPath" "win-unpacked\\*"      // relative to ContentRoot (../dist/)
+		"DepotPath" "."
+		"recursive" "1"
+	}
+
+	// Never ship steam_appid.txt — it lets the game run outside Steam.
+	"FileExclusion" "*steam_appid.txt"
+	"FileExclusion" "*.pdb"
+}
