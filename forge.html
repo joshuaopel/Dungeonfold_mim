@@ -1260,82 +1260,7 @@ function buildGbLut(scheme,colors,ramp){
   for(let k=0;k<256;k++){ const c=PAL[gbLevel(k/255,n)],o=k<<2; _lutBytes[o]=c[0]; _lutBytes[o+1]=c[1]; _lutBytes[o+2]=c[2]; _lutBytes[o+3]=255; }
   return {bytes:_lutBytes,u32:_lutU32};
 }
-let _llBuf=null,_llCtx=null; // downscaled lightmap buffer for pixelate path
 let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
-
-// Combined GB palette + lightmap pass. Call buildLightmap() first when ambient>0.
-// rawL² power curve keeps ambient dim while letting torches punch to full brightness.
-// lightLum*(n-1) maps continuously to palette stop; texLum adds ±1 stop variation.
-// At lightLum=0 result is always 0 → PAL[0] (full darkness = darkest color).
-function applyGameBoyLit(px,scheme,colors,pixelate){
-  try{
-    const PAL=(scheme==='custom'&&Array.isArray(colors)&&colors.length>=2)?colors:(GB_SCHEMES[scheme]||GB_SCHEMES.dmg);
-    const n=PAL.length;
-    if(!gbBuf){gbBuf=document.createElement('canvas');gbCtx=gbBuf.getContext('2d',{willReadFrequently:true});}
-    if(!gbCtx||!gbCtx.getImageData)return;
-    const hasLight=_lightmapReady&&!!(lightCtx&&lightCanvas&&lightCanvas.width===vw&&lightCanvas.height===vh);
-    if(pixelate!==false){
-      const P=Math.max(1,Math.min(12,Math.round(px||5)));
-      const lowW=Math.max(1,Math.ceil(vw/P)),lowH=Math.max(1,Math.ceil(vh/P));
-      if(gbBuf.width!==lowW||gbBuf.height!==lowH){gbBuf.width=lowW;gbBuf.height=lowH;}
-      gbCtx.imageSmoothingEnabled=false;
-      gbCtx.clearRect(0,0,lowW,lowH);
-      gbCtx.drawImage(cv,0,0,vw,vh,0,0,lowW,lowH);
-      let ld=null;
-      if(hasLight){
-        if(!_llBuf){_llBuf=document.createElement('canvas');_llCtx=_llBuf.getContext('2d',{willReadFrequently:true});}
-        if(_llBuf.width!==lowW||_llBuf.height!==lowH){_llBuf.width=lowW;_llBuf.height=lowH;}
-        _llCtx.drawImage(lightCanvas,0,0,vw,vh,0,0,lowW,lowH);
-        ld=_llCtx.getImageData(0,0,lowW,lowH).data;
-      }
-      const img=gbCtx.getImageData(0,0,lowW,lowH),d=img.data;
-      for(let y=0;y<lowH;y++)for(let x=0;x<lowW;x++){
-        const i=(y*lowW+x)*4;
-        const texLum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-        let c;
-        if(ld){
-          const rawL=(ld[i]*0.299+ld[i+1]*0.587+ld[i+2]*0.114)/255;
-          const lightLum=rawL*rawL; // power-2 curve: ambient stays dim, torches punch bright
-          c=PAL[Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)))];
-        }else{
-          c=PAL[gbLevel(texLum,n)];
-        }
-        d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255;
-      }
-      gbCtx.putImageData(img,0,0);
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);
-      ctx.imageSmoothingEnabled=true;
-    }else{
-      if(gbBuf.width!==vw||gbBuf.height!==vh){gbBuf.width=vw;gbBuf.height=vh;}
-      gbCtx.drawImage(cv,0,0);
-      const img=gbCtx.getImageData(0,0,vw,vh);
-      const packed=new Uint32Array(n);
-      for(let k=0;k<n;k++) packed[k]=(0xFF000000|(PAL[k][2]<<16)|(PAL[k][1]<<8)|PAL[k][0])>>>0;
-      const d32=new Uint32Array(img.data.buffer);
-      let ld=null;
-      if(hasLight) ld=lightCtx.getImageData(0,0,vw,vh).data;
-      for(let i=0,len=d32.length;i<len;i++){
-        const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-        const texLum=(299*r+587*g+114*b)/255000;
-        let s;
-        if(ld){
-          const li=i*4;
-          const rawL=(ld[li]*0.299+ld[li+1]*0.587+ld[li+2]*0.114)/255;
-          const lightLum=rawL*rawL;
-          s=Math.max(0,Math.min(n-1,Math.round(lightLum*(n-1)+(texLum-0.5)*2*lightLum)));
-        }else{
-          s=gbLevel(texLum,n);
-        }
-        d32[i]=packed[s];
-      }
-      gbCtx.putImageData(img,0,0);
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.drawImage(gbBuf,0,0);
-    }
-  }catch(e){}
-}
 
 function applyGameBoy(px,scheme,colors,ramp){
   try{
@@ -2229,7 +2154,8 @@ function setTool(t){
     iLink:'Click a plate or lever, then a door, trap, or hint, to wire them (same pair again unlinks). For doors/traps an active trigger INVERTS the start state; for hints it pops the message.',
     waypoint:'Click to add patrol points for the selected hero. Right-click the hero to clear its path. Esc to finish.',
   };
-  document.getElementById('editorHint').textContent=hints[t]||(TOOL_TILE[t]!==undefined?(isFloorT(TOOL_TILE[t])?'Left-drag to paint this floor. Mix floor types to break up large rooms.':'Left-drag to paint this wall. All walls block movement and sight.'):(TOOL_DECAL[t]?'Click to place a cosmetic '+TOOL_DECAL[t]+' (random tilt & flip). Move or remove it with Select. No gameplay effect.':''));
+  const _ctHint=(typeof t==='string'&&t.indexOf('ct:')===0)?(isFloorT(+t.slice(3))?'Left-drag to paint this custom floor. Double-click its palette button to rename, use the swatch to recolour.':'Left-drag to paint this custom wall. Double-click its palette button to rename, use the swatch to recolour.'):'';
+  document.getElementById('editorHint').textContent=hints[t]||_ctHint||(TOOL_TILE[t]!==undefined?(isFloorT(TOOL_TILE[t])?'Left-drag to paint this floor. Mix floor types to break up large rooms.':'Left-drag to paint this wall. All walls block movement and sight.'):(TOOL_DECAL[t]?'Click to place a cosmetic '+TOOL_DECAL[t]+' (random tilt & flip). Move or remove it with Select. No gameplay effect.':''));
 }
 function screenToWorld(mx,my){return{x:mx/ed.zoom+ed.cam.x,y:my/ed.zoom+ed.cam.y};}
 
