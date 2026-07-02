@@ -3842,6 +3842,9 @@ function drawCone(h){
     ctx.lineTo(h.x+ca*dd,h.y+sa*dd);
   }
   ctx.closePath();ctx.fill();
+  // outline the vision boundary at higher alpha — the fill alone disappears
+  // over dark scenes, and where an enemy can see is critical stealth info
+  ctx.strokeStyle=c.replace(/0\.\d+\)$/,'0.55)');ctx.lineWidth=1.5;ctx.stroke();
 }
 
 /* ---------- play render ---------- */
@@ -3865,10 +3868,6 @@ function renderPlay(t){
   }
   for(const p of G.props)drawPropAt(p.kind,p.x,p.y,t+p.wob,false,p);
   for(const it of G.inter)if(it.kind==='door'||it.kind==='lever')drawInter(it,it);
-  if(!G.over)for(const h of G.heroes){
-    if(h.x+h.cone.len<cam.x||h.x-h.cone.len>cam.x+vw||h.y+h.cone.len<cam.y||h.y-h.cone.len>cam.y+vh)continue;
-    drawCone(h);
-  }
   for(const h of G.heroes)drawHeroAt(h,t);
   for(const h of G.heroes)if(h.load&&h.load.length){ ctx.save(); ctx.fillStyle=PAL.gold; ctx.beginPath(); ctx.arc(h.x,h.y-h.r-11,5,0,TAU); ctx.fill(); ctx.strokeStyle=PAL.goldDark; ctx.lineWidth=1.5; ctx.stroke(); if(h.load.length>1){ ctx.fillStyle='#1a122a'; ctx.font='bold 9px Nunito'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(h.load.length,h.x,h.y-h.r-11); ctx.textBaseline='alphabetic'; } ctx.restore(); }
   for(const pr of G.props){
@@ -3892,6 +3891,10 @@ function renderPlay(t){
   applyLighting(t); // light FIRST so the palette pass quantizes the lit scene — output stays strictly on palette colors, so lighting can never blow them out
   if(_gbOn){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
   if(_gbOn){ drawGbPops(t,false); drawGbTorchFx(t); }
+  if(!G.over)for(const h of G.heroes){ // vision cones ABOVE lighting/filter — where enemies can see must stay readable in the dark
+    if(h.x+h.cone.len<cam.x||h.x-h.cone.len>cam.x+vw||h.y+h.cone.len<cam.y||h.y-h.cone.len>cam.y+vh)continue;
+    drawCone(h);
+  }
   drawPortalAt(G.portal,G.portal.active,t); // goal marker + EXIT label render ABOVE the filter/lighting, crisp like the other in-game text
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
@@ -4045,11 +4048,6 @@ function renderEditor(t){
       ctx.strokeStyle='#ffe082';ctx.lineWidth=3/ed.zoom;
       ctx.beginPath();ctx.arc(h.x,h.y,24,0,TAU);ctx.stroke();
     }
-    ctx.fillStyle='rgba(255,224,130,0.07)';
-    const d=HERO_DEFS[h.kind];
-    ctx.beginPath();ctx.moveTo(h.x,h.y);
-    ctx.arc(h.x,h.y,d.cone.len,-d.cone.fov,d.cone.fov);
-    ctx.closePath();ctx.fill();
   }
   const _lit=(ed.lightPreview&&(level.ambient||0)>0);
   if(_lit){ applyLighting(t,ed.cam.x,ed.cam.y,ed.zoom); ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom); } // light before the palette pass — same order as play
@@ -4059,6 +4057,14 @@ function renderEditor(t){
     ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom);
   }
   if(level.gb&&level.gb.on){ drawGbPops(t,true); drawGbTorchFx(t); }
+  for(const h of level.heroes){ // cone previews ABOVE lighting/filter so designers can read sightlines in dark levels
+    const d=HERO_DEFS[h.kind];
+    ctx.fillStyle='rgba(255,224,130,0.09)';
+    ctx.beginPath();ctx.moveTo(h.x,h.y);
+    ctx.arc(h.x,h.y,d.cone.len,-d.cone.fov,d.cone.fov);
+    ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(255,224,130,0.45)';ctx.lineWidth=1.5/ed.zoom;ctx.stroke();
+  }
   if(_lit||(level.gb&&level.gb.on)){
     // redraw editor aids CRISP on top of the post-processed scene
     ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1/ed.zoom;
