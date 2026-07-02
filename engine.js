@@ -905,7 +905,22 @@ function drawTorchAt(p,t){
   if(_spr())return;
   ctx.fillStyle='#6b4a2c';ctx.fillRect(p.x-3,p.y-2,6,14);
   ctx.fillStyle='rgb('+_rgb+')';ctx.beginPath();ctx.ellipse(p.x,p.y-6+fl*0.5,5,9+fl,0,0,TAU);ctx.fill();
-  ctx.fillStyle='rgba(255,255,236,0.92)';ctx.beginPath();ctx.ellipse(p.x,p.y-5,2.5,5,0,0,TAU);ctx.fill();
+  // darker hollow inside the flame body
+  ctx.fillStyle='rgba('+Math.round(_c[0]*0.45)+','+Math.round(_c[1]*0.35)+','+Math.round(_c[2]*0.3)+',0.75)';
+  ctx.beginPath();ctx.ellipse(p.x,p.y-9+fl*0.4,2.2,4,0,0,TAU);ctx.fill();
+  ctx.fillStyle='rgba(255,255,236,0.92)';ctx.beginPath();ctx.ellipse(p.x,p.y-4,2.5,4,0,0,TAU);ctx.fill();
+  // rising embers (stateless — derived from time, no particle arrays)
+  for(let i=0;i<3;i++){
+    const sp=0.35+(((p.x|0)*7+i*13)%10)/26;
+    const ph=(t*sp+i*0.37+p.x*0.017)%1;
+    if(ph>0.9)continue;
+    const ex=p.x+Math.sin(t*0.9+i*2.1+p.x*0.05)*(2+ph*11);
+    const ey=p.y-14-ph*26;
+    ctx.globalAlpha=(1-ph)*0.85;
+    ctx.fillStyle=ph<0.4?'#ffe9b0':'rgb('+_rgb+')';
+    ctx.fillRect(ex-1,ey,2,2);
+  }
+  ctx.globalAlpha=1;
 }
 /* =========================================================
    DYNAMIC LIGHTING — torches (and the Mimic) cast real light
@@ -1186,6 +1201,65 @@ function drawGbPops(t,editor){
       if(m&&real.setTransform)real.setTransform(m);
     }
   } finally { ctx=real; if(m&&ctx.setTransform){try{ctx.setTransform(m);}catch(e){}} }
+}
+
+/* ---------- GB torch flame + embers ----------
+   Drawn AFTER the palette pass: any detail drawn pre-filter gets crushed to the
+   top palette stop by the lighting quantizer, so the flame is stamped on top as
+   a crisp sprite whose 5 shades are sampled from the ACTIVE palette LUT (works
+   for presets, custom ramps of any size, and ramp images alike). Embers are
+   stateless particles — position derived from time, no arrays, no GC. */
+const _GB_FLAME_MAPS=[
+  ['...O...','..OMO..','.OMLMO.','.OMNLO.','OMLNLMO','OMLCLMO','OLCCCLO','.OLLLO.'],
+  ['....O..','..OMMO.','.OMLMO.','.OLNMO.','OMLNLMO','OMLCLMO','OLCCCLO','.OLLLO.'],
+];
+let _gbFxKey=null,_gbFxFrames=null,_gbFxCols=null;
+function _gbFlameFrames(u){
+  let cols;
+  if(level.gb.scheme==='native'){ // pixelize-only mode keeps true colors -> fixed warm ramp
+    cols={O:'#2a1608',N:'#6b3410',M:'#c66a1e',L:'#f0a83c',C:'#ffe9b0'};
+  }else{
+    const lb=buildGbLut(level.gb.scheme,level.gb.colors,level.gb.ramp).bytes;
+    const pick=i=>{const o=i<<2;return 'rgb('+lb[o]+','+lb[o+1]+','+lb[o+2]+')';};
+    // spread across the ramp: outline/notch dark, body mid, tongue light, core top
+    cols={O:pick(20),N:pick(65),M:pick(130),L:pick(200),C:pick(252)};
+  }
+  const key=u+'|'+cols.O+cols.N+cols.M+cols.L+cols.C;
+  if(_gbFxKey===key)return _gbFxFrames;
+  _gbFxFrames=_GB_FLAME_MAPS.map(rows=>{
+    const c=document.createElement('canvas'); c.width=7*u; c.height=8*u;
+    const g=c.getContext('2d');
+    rows.forEach((row,y)=>{ for(let x=0;x<7;x++){ const ch=row[x]; if(ch==='.')continue; g.fillStyle=cols[ch]; g.fillRect(x*u,y*u,u,u); } });
+    return c;
+  });
+  _gbFxKey=key; _gbFxCols=cols;
+  return _gbFxFrames;
+}
+function drawGbTorchFx(t){
+  if(!(typeof level!=='undefined'&&level&&level.gb&&level.gb.on))return;
+  const u=Math.max(3,Math.min(5,Math.round(level.gb.px||4)));
+  let fr=null;
+  try{ fr=_gbFlameFrames(u); }catch(e){ return; }
+  if(!fr)return;
+  for(const p of curTorches()){
+    if(!torchLit(p)||p.glow)continue;
+    if(p.aid&&assetImgs[p.aid])continue;          // custom-art torches keep their art
+    const f=(((t*8)|0)+(p.x|0))&1;
+    ctx.drawImage(fr[f],p.x-3.5*u,p.y-2-8*u);
+    for(let i=0;i<3;i++){                          // rising embers, deterministic per torch
+      const sp=0.35+(((p.x|0)*7+i*13)%10)/26;
+      const ph=(t*sp+i*0.37+p.x*0.017)%1;
+      if(ph>0.92)continue;
+      const ex=p.x+Math.sin(t*0.9+i*2.1+p.x*0.05)*(3+ph*13);
+      const ey=p.y-4-8*u-ph*36;
+      const s=ph<0.5?u:Math.max(2,u-2);
+      const rx=Math.round(ex-s/2),ry=Math.round(ey);
+      ctx.fillStyle=_gbFxCols.O;                   // dark rim so the spark reads over bright pools
+      ctx.fillRect(rx-1,ry-1,s+2,s+2);
+      ctx.fillStyle=ph<0.35?_gbFxCols.C:(ph<0.7?_gbFxCols.L:_gbFxCols.M);
+      ctx.fillRect(rx,ry,s,s);
+    }
+  }
 }
 
 function drawPortalAt(p,active,t){
