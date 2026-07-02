@@ -1139,65 +1139,85 @@ const gbPopVal=v=>{
   if(v===1||v===true) return 'full';
   if(typeof v!=='string'||!v) return 0;
   const px=v.endsWith('*'), k=px?v.slice(0,-1):v;
-  const ok=(k==='full'||k==='custom'||!!GB_SCHEMES[k]);
+  const ok=(k==='full'||k==='custom'||k==='scene'||!!GB_SCHEMES[k]);
   return ok?(px?k+'*':k):0;
 };
-const gbPalFor=key=>{
-  if(key==='custom'){ const c=(typeof level!=='undefined'&&level&&level.gb)?level.gb.colors:null; return (Array.isArray(c)&&c.length>=2)?c:GB_SCHEMES.dmg; }
-  return GB_SCHEMES[key]||GB_SCHEMES.dmg;
+// LUT for a pop recolor key. 'scene' follows whatever the level's filter is doing
+// (preset, custom ramp of any size, or ramp image) — the pop then reads like the
+// GB torch flame: crisp palette-true shading that survives the lighting quantizer.
+const gbPopLut=key=>{
+  if(key==='scene'){ const gb=(typeof level!=='undefined'&&level&&level.gb)||{}; return buildGbLut(gb.scheme,gb.colors,gb.ramp).bytes; }
+  if(key==='custom') return buildGbLut('custom',(typeof level!=='undefined'&&level&&level.gb)?level.gb.colors:null,null).bytes;
+  return buildGbLut(key,null,null).bytes;
 };
 // Redraw entities tagged .gbPop ON TOP of the GB scene so they stand out. 'full' = crisp full
 // colour; a scheme/custom name = the entity recoloured with THAT palette; a '*' suffix also
 // pixelates the pop to the scene's Px so it reads as part of the retro frame, not a sticker.
-let popBuf=null,popCtx=null;
+let popBuf=null,popCtx=null,popLow=null,popLowCtx=null; // popLow: small downscale buffer for pixelated pops (gbBuf belongs to the scene filter)
 function drawGbPops(t,editor){
   const tre=editor?level.treasures:G.treasures, prp=editor?level.props:G.props, her=editor?level.heroes:G.heroes;
   const items=[];
-  if(tre)for(const o of tre){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawTreasureAt(editor?{...o,bob:0}:o, editor?0:t)]); }
-  if(prp)for(const o of prp){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawPropAt(o.kind,o.x,o.y,editor?0:t,false,o)]); }
-  if(her)for(const o of her){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawHeroAt(editor?{...o,ang:0}:o, editor?0:t)]); }
-  if(!editor&&typeof G!=='undefined'&&G&&G.player&&level.gb){ const v=gbPopVal(level.gb.player); if(v)items.push([v,()=>drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid})]); }
+  if(tre)for(const o of tre){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawTreasureAt(editor?{...o,bob:0}:o, editor?0:t),o.x,o.y,44]); }
+  if(prp)for(const o of prp){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawPropAt(o.kind,o.x,o.y,editor?0:t,false,o),o.x,o.y,70]); }
+  if(her)for(const o of her){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawHeroAt(editor?{...o,ang:0}:o, editor?0:t),o.x,o.y,70]); }
+  if(!editor&&typeof G!=='undefined'&&G&&G.player&&level.gb){ const v=gbPopVal(level.gb.player); if(v)items.push([v,()=>drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid}),G.player.x,G.player.y,70]); }
   if(!items.length) return;
-  for(const [v,draw] of items) if(v==='full') draw();          // crisp full-colour: straight on top
-  const off=items.filter(([v])=>v!=='full');                    // everything needing the offscreen pass
+  for(const it of items) if(it[0]==='full') it[1]();           // crisp full-colour: straight on top
+  const off=items.filter(it=>it[0]!=='full');                   // everything needing the offscreen pass
   if(!off.length) return;
   if(!popBuf){ try{ popBuf=document.createElement('canvas'); popCtx=popBuf.getContext('2d',{willReadFrequently:true}); }catch(e){ popCtx=null; } }
-  if(!popCtx||!popCtx.getImageData){ for(const [,draw] of off) draw(); return; }  // headless fallback
+  if(!popCtx||!popCtx.getImageData){ for(const it of off) it[1](); return; }  // headless fallback
   if(popBuf.width!==vw||popBuf.height!==vh){ popBuf.width=vw; popBuf.height=vh; }
-  if(!gbBuf){ try{ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }catch(e){} }
+  if(!popLow){ try{ popLow=document.createElement('canvas'); popLowCtx=popLow.getContext('2d',{willReadFrequently:true}); }catch(e){ popLowCtx=null; } }
   let m=null; try{ m=ctx.getTransform&&ctx.getTransform(); }catch(e){}
-  const groups={}; for(const [v,draw] of off){ (groups[v]=groups[v]||[]).push(draw); }
+  const scale=m?Math.hypot(m.a,m.b):1;
+  const groups={}; for(const it of off){ (groups[it[0]]=groups[it[0]]||[]).push(it); }
   const real=ctx;
-  const recolor=(c2,w,h,key,dither)=>{
-    const PAL=gbPalFor(key), n=PAL.length, img=c2.getImageData(0,0,w,h), d=img.data;
+  // Recolor a subregion through the palette LUT. bx/by anchor the Bayer pattern to
+  // absolute screen blocks so the dither doesn't crawl as the bounding rect moves.
+  const recolor=(c2,ox,oy,w,h,key,dither,bx,by)=>{
+    const lb=gbPopLut(key), img=c2.getImageData(ox,oy,w,h), d=img.data;
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){ const i=(y*w+x)*4; if(d[i+3]<8)continue;
       let lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-      if(dither)lum+=((GB_BAYER[y&3][x&3]+0.5)/16-0.5)*0.16;
-      const c=PAL[gbLevel(lum,n)]; d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; }
-    c2.setTransform(1,0,0,1,0,0); c2.putImageData(img,0,0);
+      if(dither)lum+=((GB_BAYER[(y+by)&3][(x+bx)&3]+0.5)/16-0.5)*0.16;
+      let idx=(lum*255)|0; idx=idx<0?0:idx>255?255:idx; const o=idx<<2;
+      d[i]=lb[o]; d[i+1]=lb[o+1]; d[i+2]=lb[o+2]; }
+    c2.setTransform(1,0,0,1,0,0); c2.putImageData(img,ox,oy);
   };
   try{
     for(const v in groups){
       const px=v.endsWith('*'), key=px?v.slice(0,-1):v;
-      popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(0,0,vw,vh);
+      const grp=groups[v];
+      // union of the group's sprite bounds in SCREEN space — the whole offscreen
+      // pass (clear/downscale/recolor/composite) only touches this rect, so a
+      // single popped player costs ~a 150px square, not the full frame
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      for(const it of grp){
+        const sx=m?(m.a*it[2]+m.c*it[3]+m.e):it[2], sy=m?(m.b*it[2]+m.d*it[3]+m.f):it[3], rs=it[4]*scale;
+        if(sx-rs<x0)x0=sx-rs; if(sy-rs<y0)y0=sy-rs; if(sx+rs>x1)x1=sx+rs; if(sy+rs>y1)y1=sy+rs;
+      }
+      const P=Math.max(1,Math.min(12,Math.round((level.gb&&level.gb.px)||5)));
+      const rx=Math.max(0,Math.floor(x0/P)*P), ry=Math.max(0,Math.floor(y0/P)*P);   // block-aligned so
+      const rw=Math.min(vw,Math.ceil(x1/P)*P)-rx, rh=Math.min(vh,Math.ceil(y1/P)*P)-ry; // pop pixels match scene grid
+      if(rw<=0||rh<=0) continue;
+      popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(rx,ry,rw,rh);
       if(m&&popCtx.setTransform)popCtx.setTransform(m);
-      ctx=popCtx; for(const draw of groups[v]) draw(); ctx=real;
+      ctx=popCtx; for(const it of grp) it[1](); ctx=real;
       try{
-        if((px||key!=='full')&&gbCtx&&gbCtx.getImageData){
-          // all recoloured pops route through the cheap downscaled buffer (same as the scene filter)
-          const P=Math.max(1,Math.min(12,Math.round((level.gb&&level.gb.px)||5)));
-          const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
-          if(gbBuf.width!==lowW||gbBuf.height!==lowH){ gbBuf.width=lowW; gbBuf.height=lowH; }
-          gbCtx.imageSmoothingEnabled=false; gbCtx.clearRect(0,0,lowW,lowH);
-          gbCtx.drawImage(popBuf,0,0,vw,vh,0,0,lowW,lowH);
-          if(key!=='full') recolor(gbCtx,lowW,lowH,key,true);
-          popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(0,0,vw,vh); popCtx.imageSmoothingEnabled=false;
-          popCtx.drawImage(gbBuf,0,0,lowW,lowH,0,0,lowW*P,lowH*P);
+        if(px&&popLowCtx&&popLowCtx.getImageData){
+          const lowW=Math.max(1,rw/P|0), lowH=Math.max(1,rh/P|0);
+          if(popLow.width<lowW||popLow.height<lowH){ popLow.width=Math.max(popLow.width,lowW); popLow.height=Math.max(popLow.height,lowH); }
+          popLowCtx.setTransform(1,0,0,1,0,0);
+          popLowCtx.imageSmoothingEnabled=false; popLowCtx.clearRect(0,0,lowW,lowH);
+          popLowCtx.drawImage(popBuf,rx,ry,rw,rh,0,0,lowW,lowH);
+          if(key!=='full') recolor(popLowCtx,0,0,lowW,lowH,key,true,rx/P|0,ry/P|0);
+          popCtx.setTransform(1,0,0,1,0,0); popCtx.clearRect(rx,ry,rw,rh); popCtx.imageSmoothingEnabled=false;
+          popCtx.drawImage(popLow,0,0,lowW,lowH,rx,ry,rw,rh);
         } else if(key!=='full'){
-          recolor(popCtx,vw,vh,key,false);   // headless fallback: no downscaled buf available
+          recolor(popCtx,rx,ry,rw,rh,key,false,0,0);   // crisp (non-pixelated) recolour
         }
       }catch(e){}
-      real.setTransform(1,0,0,1,0,0); real.drawImage(popBuf,0,0);
+      real.setTransform(1,0,0,1,0,0); real.drawImage(popBuf,rx,ry,rw,rh,rx,ry,rw,rh);
       if(m&&real.setTransform)real.setTransform(m);
     }
   } finally { ctx=real; if(m&&ctx.setTransform){try{ctx.setTransform(m);}catch(e){}} }
