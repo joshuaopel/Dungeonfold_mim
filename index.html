@@ -1196,8 +1196,23 @@ function drawTorchAt(p,t){
     ctx.fillStyle='rgba(110,84,58,0.7)';ctx.beginPath();ctx.ellipse(p.x,p.y-6,4,6,0,0,TAU);ctx.fill();
     return;
   }
+  // GB filter on: swap the smooth flame/glow gradients for a chunky 2-frame pixel
+  // flame and stepped glow discs. Smooth gradients feed the palette quantizer
+  // ragged organic blobs; deliberate steps and hard pixels quantize into clean
+  // retro shapes instead (the lightmap already draws the big stepped light pool).
+  const _gbOn=!!(typeof level!=='undefined'&&level&&level.gb&&level.gb.on);
   if(p.glow){
     const ps=(p.pulse==null?1:p.pulse), br=1+Math.sin(t*ps*3)*0.18, R=18*br;
+    if(_gbOn){
+      const Rq=Math.round((R+10)/4)*4, a=0.22;
+      ctx.fillStyle='rgba('+_rgb+','+a+')';
+      ctx.beginPath();ctx.arc(p.x,p.y,Rq,0,TAU);ctx.fill();
+      ctx.beginPath();ctx.arc(p.x,p.y,Rq*0.62,0,TAU);ctx.fill();
+      if(_spr())return;
+      ctx.fillStyle='rgb('+_rgb+')';ctx.fillRect(p.x-6,p.y-6,12,12);
+      ctx.fillStyle='rgba(255,255,255,0.9)';ctx.fillRect(p.x-3,p.y-3,6,6);
+      return;
+    }
     const gb=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,R+12);
     gb.addColorStop(0,'rgba('+_rgb+',0.95)');gb.addColorStop(0.5,'rgba('+_rgb+',0.5)');gb.addColorStop(1,'rgba('+_rgb+',0)');
     ctx.fillStyle=gb;ctx.beginPath();ctx.arc(p.x,p.y,R+12,0,TAU);ctx.fill();
@@ -1208,6 +1223,25 @@ function drawTorchAt(p,t){
   }
   const amb=(level.ambient==null?0:level.ambient);
   const gr=amb>0?40:90;
+  if(_gbOn){
+    // stepped ground glow (two additive discs — quantizes to neat rings)
+    const Rq=Math.round(gr/8)*8, ga=amb>0?0.22:0.15;
+    ctx.fillStyle='rgba('+_rgb+','+ga+')';
+    ctx.beginPath();ctx.arc(p.x,p.y,Rq,0,TAU);ctx.fill();
+    ctx.beginPath();ctx.arc(p.x,p.y,Rq*0.55,0,TAU);ctx.fill();
+    if(_spr())return;
+    ctx.fillStyle='#6b4a2c';ctx.fillRect(p.x-3,p.y-2,6,14);
+    // chunky 2-frame pixel flame, desynced per torch
+    const u=3, frm=(((t*8)|0)+(p.x|0))&1, ox=frm?-u:0;
+    ctx.fillStyle='rgb('+Math.round(_c[0]*0.62)+','+Math.round(_c[1]*0.45)+','+Math.round(_c[2]*0.4)+')';
+    ctx.fillRect(p.x-2*u,p.y-11,4*u,9);            // flame body silhouette
+    ctx.fillRect(p.x-u+ox+u,p.y-14,2*u,u);         // tip flicks side to side
+    ctx.fillStyle='rgb('+_rgb+')';
+    ctx.fillRect(p.x-u,p.y-9,2*u,2*u);             // hot mid
+    ctx.fillStyle='#fff6d8';
+    ctx.fillRect(p.x-2,p.y-6,4,4);                 // white core
+    return;
+  }
   const g=ctx.createRadialGradient(p.x,p.y,4,p.x,p.y,gr+fl*4);
   g.addColorStop(0,'rgba('+_rgb+','+(amb>0?0.5:0.30)+')');g.addColorStop(1,'rgba('+_rgb+',0)');
   ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,gr+fl*4,0,TAU);ctx.fill();
@@ -1237,9 +1271,25 @@ function buildLightmap(t,camX,camY,zoom){
   lx.fillStyle='rgb('+base+','+Math.round(base*0.9)+','+Math.min(255,Math.round(base*1.08))+')';
   lx.fillRect(0,0,vw,vh);
   lx.globalCompositeOperation='lighter';
+  // GB filter on: build the light pools out of STEPPED additive discs instead of a
+  // smooth radial gradient. The palette pass quantizes light anyway — feeding it
+  // deliberate steps gives clean concentric retro rings (one per palette band)
+  // instead of ragged quantization edges, and the radius snaps to 16px so torch
+  // flicker pops between ring sizes rather than shimmering. 4 solid arcs are also
+  // cheaper than building a radial gradient per light per frame.
+  const stepped=!!(typeof level!=='undefined'&&level&&level.gb&&level.gb.on);
   const addLight=(wx,wy,r,cr,cg,cb,inten)=>{
     const sx=(wx-camX)*zoom,sy=(wy-camY)*zoom,R=r*zoom;
     if(sx<-R||sy<-R||sx>vw+R||sy>vh+R)return;
+    if(stepped){
+      const Rq=Math.max(16,Math.round(R/16)*16);
+      lx.fillStyle='rgba('+cr+','+cg+','+cb+','+(inten*0.25).toFixed(3)+')';
+      lx.beginPath();lx.arc(sx,sy,Rq,0,TAU);lx.fill();
+      lx.beginPath();lx.arc(sx,sy,Rq*0.72,0,TAU);lx.fill();
+      lx.beginPath();lx.arc(sx,sy,Rq*0.5,0,TAU);lx.fill();
+      lx.beginPath();lx.arc(sx,sy,Rq*0.3,0,TAU);lx.fill();
+      return;
+    }
     const grd=lx.createRadialGradient(sx,sy,Math.min(8,R*0.15),sx,sy,R);
     grd.addColorStop(0,'rgba('+cr+','+cg+','+cb+','+inten+')');
     grd.addColorStop(0.55,'rgba('+cr+','+cg+','+cb+','+(inten*0.4)+')');
