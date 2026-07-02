@@ -133,57 +133,57 @@
 
 /* ===================== RETRO / GAME BOY UI THEME (Forge) ===================== */
 :root{
-  --ink:#0c140a; --stone:#16240e; --parchment:#c2da92; --gold:#e9f25c; --amber:#a7d24e;
-  --mimic:#79e6c4; --danger:#e0655a; --panelB:#5f9039;
-  --bg:#0c120a; --panel:#15230d; --panel2:#1d3214; --sub:#82a851; --line:#2b471d;
+  --ink:#120d18; --stone:#1e1826; --parchment:#d4cedd; --gold:#dab84e; --amber:#c98f3e;
+  --mimic:#ab7fe0; --danger:#cc5c55; --panelB:#8a8199;
+  --bg:#120d16; --panel:#1a1420; --panel2:#262030; --sub:#8d8599; --line:#3a3145;
   --pix:'PressStart','Courier New',monospace; --body:'Silkscreen','Courier New',monospace;
 }
 html,body{background:var(--bg);color:var(--parchment);font-family:var(--body);letter-spacing:.4px}
 body,button,input,select,textarea,.tool,.propRow,.enCard,#editorHint,.sub{font-family:var(--body)}
 h1,h2,#goalValue,#formName,#rank,button.primary,#cutText{font-family:var(--pix) !important}
-h1{text-transform:uppercase;letter-spacing:2px;text-shadow:4px 4px 0 #0a0f07;color:var(--gold)}
+h1{text-transform:uppercase;letter-spacing:2px;text-shadow:4px 4px 0 #0b0812;color:var(--gold)}
 h2{text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
 /* pixel edges */
 .panel,.card,button,.tool,.tool .sw,.enCard,.swatch,.propRow,#goalBarWrap,#goalBar,.customTag,input,select,textarea{border-radius:0 !important}
-.panel{background:var(--panel);border:2px solid var(--panelB);backdrop-filter:none;box-shadow:inset 0 0 0 1px #0a0f07}
-.overlay{background:rgba(8,12,7,.94)}
-.card{background:var(--panel);border:3px solid var(--panelB);box-shadow:6px 6px 0 #070b05,inset 0 0 0 2px #0a0f07;position:relative;overflow:hidden}
+.panel{background:var(--panel);border:2px solid var(--panelB);backdrop-filter:none;box-shadow:inset 0 0 0 1px #0b0812}
+.overlay{background:rgba(10,7,15,.94)}
+.card{background:var(--panel);border:3px solid var(--panelB);box-shadow:6px 6px 0 #080611,inset 0 0 0 2px #0b0812;position:relative;overflow:hidden}
 .card::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);z-index:2}
 .card>*{position:relative;z-index:3}
 /* buttons */
-button{font-family:var(--body);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-size:11px;color:var(--parchment);background:var(--panel2);border:2px solid var(--panelB);box-shadow:2px 2px 0 #070b05;padding:5px 9px;cursor:pointer;transition:none}
+button{font-family:var(--body);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-size:11px;color:var(--parchment);background:var(--panel2);border:2px solid var(--panelB);box-shadow:2px 2px 0 #080611;padding:5px 9px;cursor:pointer;transition:none}
 button:hover{border-color:var(--gold);color:var(--gold)}
-button:active{transform:translate(2px,2px);box-shadow:0 0 0 #070b05}
-button.primary{font-size:15px;color:var(--ink);background:var(--gold);border:2px solid #0a0f07;box-shadow:4px 4px 0 #2b471d;text-shadow:none;padding:10px 22px}
-button.primary:hover{background:#f2fa72;color:var(--ink)}
+button:active{transform:translate(2px,2px);box-shadow:0 0 0 #080611}
+button.primary{font-size:15px;color:var(--ink);background:var(--gold);border:2px solid #0b0812;box-shadow:4px 4px 0 #3a3145;text-shadow:none;padding:10px 22px}
+button.primary:hover{background:#e8c95e;color:var(--ink)}
 /* form fields */
-input,select,textarea{background:#0a0f07;color:var(--parchment);border:2px solid var(--panelB)}
+input,select,textarea{background:#0b0812;color:var(--parchment);border:2px solid var(--panelB)}
 input[type=range]{padding:0;border:none;background:transparent}
 input[type=color]{padding:0}
 /* editor bar */
-#editorBar{background:var(--panel);border:2px solid var(--panelB);box-shadow:inset 0 0 0 1px #0a0f07}
+#editorBar{background:var(--panel);border:2px solid var(--panelB);box-shadow:inset 0 0 0 1px #0b0812}
 #editorBar .sep,#editorBar span[style*="border-left"]{background:var(--line) !important;border-color:var(--line) !important}
 /* palette + collapsible sections */
-#palette{background:var(--panel);border:2px solid var(--panelB);box-shadow:inset 0 0 0 1px #0a0f07}
+#palette{background:var(--panel);border:2px solid var(--panelB);box-shadow:inset 0 0 0 1px #0b0812}
 .palHead{color:var(--sub);border-top:1px solid var(--line)}
 .palHead:hover{color:var(--gold)}
-.palSec.collapsed .palHead{color:#5d7a3e}
-.palHead .cnt{color:#5d7a3e}
+.palSec.collapsed .palHead{color:#6b6379}
+.palHead .cnt{color:#6b6379}
 .tool{color:var(--parchment);border:2px solid transparent;font-weight:700}
 .tool:hover{border-color:var(--line);background:rgba(95,144,57,.12)}
 .tool.active{border-color:var(--gold);background:rgba(233,242,92,.12);color:var(--gold)}
-.tool .sw{border:1px solid #0a0f07;image-rendering:pixelated}
+.tool .sw{border:1px solid #0b0812;image-rendering:pixelated}
 /* right panels */
 #editorHint{color:var(--sub)}
 .propRow{color:var(--parchment)} .propRow .val{color:var(--sub)}
-.swatch{border:2px solid #0a0f07} .swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--gold)}
+.swatch{border:2px solid #0b0812} .swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--gold)}
 .enCard{background:var(--panel2);border:2px solid var(--panelB)} .enCard .rowline,.enCard .abil{color:var(--parchment)}
 .enCard.activeDef{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
 .inspHead #selLabel{color:var(--gold)} .inspLab{color:var(--sub)} .inspTip{color:var(--sub)}
-#selPanel textarea{background:#0a0f07;border:2px solid var(--panelB);color:var(--parchment)}
+#selPanel textarea{background:#0b0812;border:2px solid var(--panelB);color:var(--parchment)}
 /* hud (playtest) */
-#goalValue{color:var(--gold)} #formName{color:var(--mimic)} #goalBarWrap{background:#0a0f07;border:1px solid var(--line)} #goalBar{background:var(--gold)}
-.sub{color:#a7c779}
+#goalValue{color:var(--gold)} #formName{color:var(--mimic)} #goalBarWrap{background:#0b0812;border:1px solid var(--line)} #goalBar{background:var(--gold)}
+.sub{color:#a49bb3}
 </style>
 </head>
 <body>
@@ -1662,7 +1662,7 @@ function drawGbTorchFx(t){
 function drawPortalAt(p,active,t){
   const W=36, half=W/2;
   ctx.save(); ctx.translate(p.x,p.y);
-  // pulsing glow under the exit (pre-GB, so it reads as part of the retro art)
+  // pulsing glow under the exit (drawn post-filter in play: the goal marker stays crisp and visible)
   const pulse=active?(0.5+0.5*Math.sin(t*3)):0;
   if(active){
     const R=half+14+pulse*8, g=ctx.createRadialGradient(0,0,4,0,0,R);
@@ -1694,7 +1694,7 @@ function drawPortalAt(p,active,t){
     ctx.strokeRect(-half,-half,W,W);
   }
   ctx.restore();
-  // EXIT label — part of the art, so pre-GB and pixelated. Pixel font + dark outline.
+  // EXIT label — renders above the filter stack like the other in-game text. Pixel font + dark outline.
   ctx.textAlign='center'; ctx.font='8px PressStart, monospace';
   ctx.fillStyle='rgba(8,16,8,0.85)'; ctx.fillText('EXIT', p.x+1, p.y-half-8+1);
   ctx.fillStyle=active?'#eaff9c':'#9a8fb6'; ctx.fillText('EXIT', p.x, p.y-half-8);
@@ -3857,7 +3857,6 @@ function renderPlay(t){
   for(const d of (level.decals||[]))drawDecal(d);
   drawObjects();
   for(const it of G.inter)if(it.kind==='plate'||it.kind==='trap')drawInter(it,it);
-  drawPortalAt(G.portal,G.portal.active,t);
   for(const tr of G.treasures)if(!tr.taken)drawTreasureAt(tr,t);
   for(const k of (G.keys||[]))if(!k.taken)drawKeyItem(k,t);
   for(const d of G.decoys)if(d.t>0){
@@ -3893,6 +3892,7 @@ function renderPlay(t){
   applyLighting(t); // light FIRST so the palette pass quantizes the lit scene — output stays strictly on palette colors, so lighting can never blow them out
   if(_gbOn){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
   if(_gbOn){ drawGbPops(t,false); drawGbTorchFx(t); }
+  drawPortalAt(G.portal,G.portal.active,t); // goal marker + EXIT label render ABOVE the filter/lighting, crisp like the other in-game text
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
       const w=30,bx=P.x-w/2,by=P.y+P.r+8,fr=P.integrity/100;

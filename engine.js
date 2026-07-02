@@ -1323,7 +1323,7 @@ function drawGbTorchFx(t){
 function drawPortalAt(p,active,t){
   const W=36, half=W/2;
   ctx.save(); ctx.translate(p.x,p.y);
-  // pulsing glow under the exit (pre-GB, so it reads as part of the retro art)
+  // pulsing glow under the exit (drawn post-filter in play: the goal marker stays crisp and visible)
   const pulse=active?(0.5+0.5*Math.sin(t*3)):0;
   if(active){
     const R=half+14+pulse*8, g=ctx.createRadialGradient(0,0,4,0,0,R);
@@ -1355,7 +1355,7 @@ function drawPortalAt(p,active,t){
     ctx.strokeRect(-half,-half,W,W);
   }
   ctx.restore();
-  // EXIT label — part of the art, so pre-GB and pixelated. Pixel font + dark outline.
+  // EXIT label — renders above the filter stack like the other in-game text. Pixel font + dark outline.
   ctx.textAlign='center'; ctx.font='8px PressStart, monospace';
   ctx.fillStyle='rgba(8,16,8,0.85)'; ctx.fillText('EXIT', p.x+1, p.y-half-8+1);
   ctx.fillStyle=active?'#eaff9c':'#9a8fb6'; ctx.fillText('EXIT', p.x, p.y-half-8);

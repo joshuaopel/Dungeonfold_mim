@@ -100,63 +100,63 @@
 
 /* ===================== RETRO / GAME BOY UI THEME ===================== */
 :root{
-  --ink:#0c140a; --parchment:#c2da92; --gold:#e9f25c; --amber:#a7d24e;
-  --mimic:#79e6c4; --danger:#e0655a; --panelB:#5f9039;
-  --bg:#0c120a; --panel:#15230d; --panel2:#1d3214; --sub:#82a851; --line:#2b471d;
+  --ink:#120d18; --parchment:#d4cedd; --gold:#dab84e; --amber:#c98f3e;
+  --mimic:#ab7fe0; --danger:#cc5c55; --panelB:#8a8199;
+  --bg:#120d16; --panel:#1a1420; --panel2:#262030; --sub:#8d8599; --line:#3a3145;
   --pix:'PressStart','Courier New',monospace;
   --body:'Silkscreen','Courier New',monospace;
 }
 html,body{background:var(--bg);color:var(--parchment);font-family:var(--body);letter-spacing:.5px;-webkit-font-smoothing:none}
 body,button,.sub,.controls,.stats,#formHint,#timer,.lvlCard .meta,#ctrlHint,#settingsScreen .setRow,#bindList .bindRow{font-family:var(--body)}
 h1,h2,#goalValue,#formName,#rank,.lvlCard .num,.lvlCard .nm,.lvlCard .rank,button.primary,#cutText{font-family:var(--pix) !important}
-h1{text-transform:uppercase;letter-spacing:2px;text-shadow:4px 4px 0 #0a0f07,0 0 0 #000;color:var(--gold)}
+h1{text-transform:uppercase;letter-spacing:2px;text-shadow:4px 4px 0 #0b0812,0 0 0 #000;color:var(--gold)}
 h2{text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
 /* pixel edges everywhere structural */
 .panel,.card,button,.ab,.lvlCard,#goalBarWrap,#goalBar,.controls b,#bindList .bindRow button,.customTag,.ab .cd{border-radius:0 !important}
-.panel{background:var(--panel);border:2px solid var(--panelB);backdrop-filter:none;box-shadow:inset 0 0 0 1px #0a0f07}
-.overlay{background:rgba(8,12,7,.94)}
-.card{background:var(--panel);border:3px solid var(--panelB);box-shadow:6px 6px 0 #070b05,inset 0 0 0 2px #0a0f07;position:relative;overflow:hidden}
+.panel{background:var(--panel);border:2px solid var(--panelB);backdrop-filter:none;box-shadow:inset 0 0 0 1px #0b0812}
+.overlay{background:rgba(10,7,15,.94)}
+.card{background:var(--panel);border:3px solid var(--panelB);box-shadow:6px 6px 0 #080611,inset 0 0 0 2px #0b0812;position:relative;overflow:hidden}
 /* CRT scanlines on cards */
 .card::after,#cutscene::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);mix-blend-mode:multiply;z-index:2}
 .card>*{position:relative;z-index:3}
 /* buttons: blocky, uppercase, hard offset shadow */
-button{font-family:var(--body);font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:11px;color:var(--parchment);background:var(--panel2);border:2px solid var(--panelB);box-shadow:3px 3px 0 #070b05;padding:7px 12px;transition:none}
+button{font-family:var(--body);font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:11px;color:var(--parchment);background:var(--panel2);border:2px solid var(--panelB);box-shadow:3px 3px 0 #080611;padding:7px 12px;transition:none}
 button:hover{border-color:var(--gold);color:var(--gold)}
-button:active{transform:translate(3px,3px);box-shadow:0 0 0 #070b05}
-button.primary{font-size:16px;letter-spacing:1px;color:var(--ink);background:var(--gold);border:2px solid #0a0f07;box-shadow:5px 5px 0 #2b471d;text-shadow:none;padding:12px 26px}
-button.primary:hover{background:#f2fa72;color:var(--ink)}
-button.primary:active{transform:translate(5px,5px);box-shadow:0 0 0 #2b471d}
+button:active{transform:translate(3px,3px);box-shadow:0 0 0 #080611}
+button.primary{font-size:16px;letter-spacing:1px;color:var(--ink);background:var(--gold);border:2px solid #0b0812;box-shadow:5px 5px 0 #3a3145;text-shadow:none;padding:12px 26px}
+button.primary:hover{background:#e8c95e;color:var(--ink)}
+button.primary:active{transform:translate(5px,5px);box-shadow:0 0 0 #3a3145}
 /* HUD chips + bars */
 #goalValue{color:var(--gold)}
 #goalLabel,#formHint,#timer,#goalLabel{color:var(--sub)}
-#goalBarWrap{background:#0a0f07;border:1px solid var(--line)}
+#goalBarWrap{background:#0b0812;border:1px solid var(--line)}
 #goalBar{background:var(--gold)}
 #formName{color:var(--mimic)}
-.ab{background:var(--panel);border:2px solid var(--panelB);box-shadow:2px 2px 0 #070b05}
+.ab{background:var(--panel);border:2px solid var(--panelB);box-shadow:2px 2px 0 #080611}
 .ab .key{color:var(--sub)} .ab.ready{border-color:var(--gold)}
-.ab .cd{background:rgba(121,230,196,.30)}
+.ab .cd{background:rgba(171,127,224,.30)}
 /* misc text */
-.sub{color:#a7c779} .controls{color:var(--parchment)}
-.controls b{color:var(--gold);background:#0a0f07;border:1px solid var(--panelB);font-size:10px}
+.sub{color:#a49bb3} .controls{color:var(--parchment)}
+.controls b{color:var(--gold);background:#0b0812;border:1px solid var(--panelB);font-size:10px}
 .stats span:nth-child(even){color:var(--gold)} #rank{color:var(--gold)}
 .lvlCard{background:var(--panel);border:2px solid var(--panelB)}
 .lvlCard .num{color:var(--sub)} .lvlCard .nm{color:var(--parchment)} .lvlCard .rank{color:var(--gold)} .lvlCard .meta{color:var(--sub)}
-.customTag{color:var(--mimic);border:1px solid #2e635e}
+.customTag{color:var(--mimic);border:1px solid #4f4463}
 #dropHint,#ctrlHint{color:var(--sub)} #ctrlHint b{color:var(--gold)} body.dragover #dropHint{color:var(--gold)}
-#cutText{color:#dff0c0;font-size:15px;line-height:1.6}
+#cutText{color:#d9d3e4;font-size:15px;line-height:1.6}
 #cutHint{color:var(--sub)} .version{color:var(--sub)}
-#settingsScreen .setRow{color:#bcd88a} #bindList .bindRow{color:#a7c779}
+#settingsScreen .setRow{color:#b4abc4} #bindList .bindRow{color:#a49bb3}
 #bindList .bindRow button.listening{background:var(--gold);color:var(--ink)}
 /* touch controls stay readable but squared-off bg */
-.tbtn{background:var(--panel);border:2px solid var(--panelB)} .tbtn:active{background:rgba(121,230,196,.4)}
+.tbtn{background:var(--panel);border:2px solid var(--panelB)} .tbtn:active{background:rgba(171,127,224,.4)}
 #tSneak.on{border-color:var(--gold);color:var(--gold)}
 
 /* ===================== TITLE SCREEN ===================== */
 .titleCard{max-width:600px}
 .logoWrap{margin-bottom:6px}
-.mimicMark{display:block;margin:0 auto 12px;filter:drop-shadow(3px 3px 0 #070b05)}
-.logoMain{font-size:clamp(22px,6.4vw,42px) !important;line-height:1;white-space:nowrap;margin:0;color:var(--gold);text-shadow:4px 4px 0 #0a0f07}
-.logoSub{font-family:var(--pix);font-size:clamp(9px,2.5vw,15px);color:var(--mimic);letter-spacing:4px;margin-top:10px;text-shadow:2px 2px 0 #070b05}
+.mimicMark{display:block;margin:0 auto 12px;filter:drop-shadow(3px 3px 0 #080611)}
+.logoMain{font-size:clamp(22px,6.4vw,42px) !important;line-height:1;white-space:nowrap;margin:0;color:var(--gold);text-shadow:4px 4px 0 #0b0812}
+.logoSub{font-family:var(--pix);font-size:clamp(9px,2.5vw,15px);color:var(--mimic);letter-spacing:4px;margin-top:10px;text-shadow:2px 2px 0 #080611}
 .tagline{margin:16px auto 20px;max-width:430px;line-height:1.7}
 .menu{display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto;max-width:300px}
 .menu button,.menu .primary{width:100%}
@@ -171,7 +171,7 @@ button.primary:active{transform:translate(5px,5px);box-shadow:0 0 0 #2b471d}
   .mimicMark{animation:mimicFloat 2.6s ease-in-out infinite}
   @keyframes mimicFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
   .menu .primary{animation:beginPulse 1.7s ease-in-out infinite}
-  @keyframes beginPulse{0%,100%{box-shadow:5px 5px 0 #2b471d}50%{box-shadow:5px 5px 0 #2b471d,0 0 16px var(--gold)}}
+  @keyframes beginPulse{0%,100%{box-shadow:5px 5px 0 #3a3145}50%{box-shadow:5px 5px 0 #3a3145,0 0 16px var(--gold)}}
 }
 </style>
 </head>
@@ -214,18 +214,18 @@ button.primary:active{transform:translate(5px,5px);box-shadow:0 0 0 #2b471d}
   <div class="card titleCard">
     <div class="logoWrap">
       <svg class="mimicMark" viewBox="0 0 64 58" width="108" height="98" shape-rendering="crispEdges" aria-hidden="true">
-        <rect x="8" y="52" width="48" height="4" fill="#0a0f07"/>
-        <rect x="10" y="28" width="44" height="24" fill="#1d3214" stroke="#5f9039" stroke-width="2"/>
+        <rect x="8" y="52" width="48" height="4" fill="#0b0812"/>
+        <rect x="10" y="28" width="44" height="24" fill="#262030" stroke="#8a8199" stroke-width="2"/>
         <rect x="19" y="28" width="3" height="24" fill="#3a5e22"/>
         <rect x="42" y="28" width="3" height="24" fill="#3a5e22"/>
-        <polygon points="11,29 16,35 21,29 26,35 31,29 36,35 41,29 46,35 51,29 53,29 11,29" fill="#0a0f07"/>
-        <polygon points="11,29 16,23 21,29 26,23 31,29 36,23 41,29 46,23 51,29" fill="#c2da92"/>
-        <rect x="20" y="40" width="7" height="7" fill="#79e6c4"/>
-        <rect x="37" y="40" width="7" height="7" fill="#79e6c4"/>
-        <rect x="22" y="42" width="3" height="3" fill="#0a0f07"/>
-        <rect x="39" y="42" width="3" height="3" fill="#0a0f07"/>
-        <rect x="10" y="16" width="44" height="9" fill="#24401a" stroke="#5f9039" stroke-width="2"/>
-        <rect x="30" y="44" width="4" height="6" fill="#e9f25c"/>
+        <polygon points="11,29 16,35 21,29 26,35 31,29 36,35 41,29 46,35 51,29 53,29 11,29" fill="#0b0812"/>
+        <polygon points="11,29 16,23 21,29 26,23 31,29 36,23 41,29 46,23 51,29" fill="#d4cedd"/>
+        <rect x="20" y="40" width="7" height="7" fill="#ab7fe0"/>
+        <rect x="37" y="40" width="7" height="7" fill="#ab7fe0"/>
+        <rect x="22" y="42" width="3" height="3" fill="#0b0812"/>
+        <rect x="39" y="42" width="3" height="3" fill="#0b0812"/>
+        <rect x="10" y="16" width="44" height="9" fill="#24401a" stroke="#8a8199" stroke-width="2"/>
+        <rect x="30" y="44" width="4" height="6" fill="#dab84e"/>
       </svg>
       <h1 class="logoMain">DUNGEONFOLK</h1>
       <div class="logoSub">MIM’S ADVENTURE</div>
@@ -1666,7 +1666,7 @@ function drawGbTorchFx(t){
 function drawPortalAt(p,active,t){
   const W=36, half=W/2;
   ctx.save(); ctx.translate(p.x,p.y);
-  // pulsing glow under the exit (pre-GB, so it reads as part of the retro art)
+  // pulsing glow under the exit (drawn post-filter in play: the goal marker stays crisp and visible)
   const pulse=active?(0.5+0.5*Math.sin(t*3)):0;
   if(active){
     const R=half+14+pulse*8, g=ctx.createRadialGradient(0,0,4,0,0,R);
@@ -1698,7 +1698,7 @@ function drawPortalAt(p,active,t){
     ctx.strokeRect(-half,-half,W,W);
   }
   ctx.restore();
-  // EXIT label — part of the art, so pre-GB and pixelated. Pixel font + dark outline.
+  // EXIT label — renders above the filter stack like the other in-game text. Pixel font + dark outline.
   ctx.textAlign='center'; ctx.font='8px PressStart, monospace';
   ctx.fillStyle='rgba(8,16,8,0.85)'; ctx.fillText('EXIT', p.x+1, p.y-half-8+1);
   ctx.fillStyle=active?'#eaff9c':'#9a8fb6'; ctx.fillText('EXIT', p.x, p.y-half-8);
@@ -3129,7 +3129,6 @@ function renderPlay(t){
   for(const d of (level.decals||[]))drawDecal(d);
   drawObjects();
   for(const it of G.inter)if(it.kind==='plate'||it.kind==='trap')drawInter(it,it);
-  drawPortalAt(G.portal,G.portal.active,t);
   for(const tr of G.treasures)if(!tr.taken)drawTreasureAt(tr,t);
   for(const k of (G.keys||[]))if(!k.taken)drawKeyItem(k,t);
   for(const d of G.decoys)if(d.t>0){
@@ -3165,6 +3164,7 @@ function renderPlay(t){
   applyLighting(t); // light FIRST so the palette pass quantizes the lit scene — output stays strictly on palette colors, so lighting can never blow them out
   if(_gbOn){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
   if(_gbOn){ drawGbPops(t,false); drawGbTorchFx(t); }
+  drawPortalAt(G.portal,G.portal.active,t); // goal marker + EXIT label render ABOVE the filter/lighting, crisp like the other in-game text
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
       const w=30,bx=P.x-w/2,by=P.y+P.r+8,fr=P.integrity/100;
