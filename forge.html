@@ -1221,7 +1221,6 @@ let lightCanvas=null,lightCtx=null;
 // Build the lightmap into lightCanvas but do NOT multiply onto ctx.
 // Returns true if lighting is active (ambient>0).
 function buildLightmap(t,camX,camY,zoom){
-  _lightmapReady=false;
   const amb=(level.ambient==null?0:level.ambient);
   if(amb<=0)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
@@ -1256,7 +1255,6 @@ function buildLightmap(t,camX,camY,zoom){
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
-  _lightmapReady=true;
   return true;
 }
 function applyLighting(t,camX,camY,zoom){
@@ -1336,9 +1334,8 @@ function buildGbLut(scheme,colors,ramp){
   for(let k=0;k<256;k++){ const c=PAL[gbLevel(k/255,n)],o=k<<2; _lutBytes[o]=c[0]; _lutBytes[o+1]=c[1]; _lutBytes[o+2]=c[2]; _lutBytes[o+3]=255; }
   return {bytes:_lutBytes,u32:_lutU32};
 }
-let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
-function applyGameBoy(px,scheme,colors,ramp){
+function applyGameBoy(px,scheme,colors,ramp,lift){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -1355,7 +1352,14 @@ function applyGameBoy(px,scheme,colors,ramp){
       // Single pass: auto-contrast using LAST frame's smoothed range (mapping the full
       // ramp across the scene's luminance), while measuring THIS frame's range for next
       // frame. 1-frame latency is invisible and avoids a second full-buffer pass.
-      const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+      // lift (lighting active): FIXED span so the mapping is absolute, not relative.
+      // Auto-contrast would re-brighten the ambient veil, and a few bright flame
+      // pixels would compress torch pools into one stop. Span 0.20 was measured from
+      // the lit-scene histogram at 50% ambient: shadow <0.05, ambient floor 0.05-0.10,
+      // wall caps 0.10-0.15, torch pools 0.15+ — one palette stop per band, so a pool
+      // walks the whole ramp and anything brighter clips to the top stop (no blowout).
+      // No lighting: auto-contrast as before (floor 0.34 avoids over-stretching).
+      const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
       let lo=1,hi=0;
       for(let p=0;p<N;p++){
         const i=p*4;
@@ -1374,7 +1378,7 @@ function applyGameBoy(px,scheme,colors,ramp){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors,ramp){
+function applyColorClamp(scheme,colors,ramp,lift){
   try{
     if(scheme==='native')return;
     if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
@@ -1387,7 +1391,8 @@ function applyColorClamp(scheme,colors,ramp){
     const len=d32.length;
     // Single pass: auto-contrast with last frame's smoothed range while measuring this
     // frame's range for next frame (avoids a second full-resolution pass).
-    const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+    // lift = fixed absolute span under lighting; else auto-contrast. See applyGameBoy.
+    const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
     let lo=1,hi=0;
     for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
@@ -3687,9 +3692,17 @@ function renderPlay(t){
   if(G.player&&!G.over){const _pa=G.player,_pulse=0.15+Math.sin(t*2)*0.05;const _ag=ctx.createRadialGradient(_pa.x,_pa.y+10,0,_pa.x,_pa.y+10,34);_ag.addColorStop(0,'rgba(190,160,255,'+_pulse+')');_ag.addColorStop(1,'rgba(190,160,255,0)');ctx.save();ctx.fillStyle=_ag;ctx.beginPath();ctx.ellipse(_pa.x,_pa.y+10,34,20,0,0,TAU);ctx.fill();ctx.restore();}
   drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid});
   for(const to of curTorches())drawTorchAt(to,t);
-  if(G.gb&&G.gb.on){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.ramp); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.ramp); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
-  applyLighting(t);
-  if(G.gb&&G.gb.on) drawGbPops(t,false);
+  const _gbOn=!!(G.gb&&G.gb.on), _litOn=(level.ambient||0)>0;
+  if(_gbOn){ // vignette must land BEFORE the palette pass so it quantizes with the scene
+    ctx.setTransform(1,0,0,1,0,0);
+    const vg=ctx.createRadialGradient(vw/2,vh/2,Math.min(vw,vh)*0.45,vw/2,vh/2,Math.max(vw,vh)*0.75);
+    vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(8,4,16,0.55)');
+    ctx.fillStyle=vg;ctx.fillRect(0,0,vw,vh);
+    ctx.setTransform(1,0,0,1,-cam.x,-cam.y);
+  }
+  applyLighting(t); // light FIRST so the palette pass quantizes the lit scene — output stays strictly on palette colors, so lighting can never blow them out
+  if(_gbOn){ if(G.gb.pixelate!==false) applyGameBoy(G.gb.px,G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); else applyColorClamp(G.gb.scheme,G.gb.colors,G.gb.ramp,_litOn); ctx.setTransform(1,0,0,1,-cam.x,-cam.y); }
+  if(_gbOn) drawGbPops(t,false);
   { const P=G.player;
     if(P.form!=='mimic'&&(P.integrity<99.5||P.crackT>0)){
       const w=30,bx=P.x-w/2,by=P.y+P.r+8,fr=P.integrity/100;
@@ -3736,9 +3749,11 @@ function renderPlay(t){
     ctx.globalAlpha=1;
   }
   ctx.setTransform(1,0,0,1,0,0);
-  const g=ctx.createRadialGradient(vw/2,vh/2,Math.min(vw,vh)*0.45,vw/2,vh/2,Math.max(vw,vh)*0.75);
-  g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(8,4,16,0.55)');
-  ctx.fillStyle=g;ctx.fillRect(0,0,vw,vh);
+  if(!_gbOn){ // with the GB filter on the vignette was already drawn pre-filter
+    const g=ctx.createRadialGradient(vw/2,vh/2,Math.min(vw,vh)*0.45,vw/2,vh/2,Math.max(vw,vh)*0.75);
+    g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(8,4,16,0.55)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,vw,vh);
+  }
   cam.x=_cx; cam.y=_cy;
   if(G.showMap)drawMinimap();
   if(FLASH>0){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='rgba('+FLASHCOL+','+(FLASH*0.5).toFixed(3)+')'; ctx.fillRect(0,0,vw,vh); }
@@ -3847,12 +3862,12 @@ function renderEditor(t){
     ctx.closePath();ctx.fill();
   }
   const _lit=(ed.lightPreview&&(level.ambient||0)>0);
+  if(_lit){ applyLighting(t,ed.cam.x,ed.cam.y,ed.zoom); ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom); } // light before the palette pass — same order as play
   if(level.gb&&level.gb.on){
-    if(level.gb.pixelate!==false) applyGameBoy(level.gb.px,level.gb.scheme,level.gb.colors,level.gb.ramp);
-    else applyColorClamp(level.gb.scheme,level.gb.colors,level.gb.ramp);
+    if(level.gb.pixelate!==false) applyGameBoy(level.gb.px,level.gb.scheme,level.gb.colors,level.gb.ramp,_lit);
+    else applyColorClamp(level.gb.scheme,level.gb.colors,level.gb.ramp,_lit);
     ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom);
   }
-  if(_lit){ applyLighting(t,ed.cam.x,ed.cam.y,ed.zoom); ctx.setTransform(ed.zoom,0,0,ed.zoom,-ed.cam.x*ed.zoom,-ed.cam.y*ed.zoom); }
   if(level.gb&&level.gb.on) drawGbPops(t,true);
   if(_lit||(level.gb&&level.gb.on)){
     // redraw editor aids CRISP on top of the post-processed scene

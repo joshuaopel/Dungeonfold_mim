@@ -882,7 +882,6 @@ let lightCanvas=null,lightCtx=null;
 // Build the lightmap into lightCanvas but do NOT multiply onto ctx.
 // Returns true if lighting is active (ambient>0).
 function buildLightmap(t,camX,camY,zoom){
-  _lightmapReady=false;
   const amb=(level.ambient==null?0:level.ambient);
   if(amb<=0)return false;
   if(camX==null)camX=cam.x; if(camY==null)camY=cam.y; if(!zoom)zoom=1;
@@ -917,7 +916,6 @@ function buildLightmap(t,camX,camY,zoom){
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
-  _lightmapReady=true;
   return true;
 }
 function applyLighting(t,camX,camY,zoom){
@@ -997,9 +995,8 @@ function buildGbLut(scheme,colors,ramp){
   for(let k=0;k<256;k++){ const c=PAL[gbLevel(k/255,n)],o=k<<2; _lutBytes[o]=c[0]; _lutBytes[o+1]=c[1]; _lutBytes[o+2]=c[2]; _lutBytes[o+3]=255; }
   return {bytes:_lutBytes,u32:_lutU32};
 }
-let _lightmapReady=false; // set true by buildLightmap on success, prevents stale maps
 
-function applyGameBoy(px,scheme,colors,ramp){
+function applyGameBoy(px,scheme,colors,ramp,lift){
   try{
     const P=Math.max(1,Math.min(12,Math.round(px||5)));
     const lowW=Math.max(1,Math.ceil(vw/P)), lowH=Math.max(1,Math.ceil(vh/P));
@@ -1016,7 +1013,14 @@ function applyGameBoy(px,scheme,colors,ramp){
       // Single pass: auto-contrast using LAST frame's smoothed range (mapping the full
       // ramp across the scene's luminance), while measuring THIS frame's range for next
       // frame. 1-frame latency is invisible and avoids a second full-buffer pass.
-      const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+      // lift (lighting active): FIXED span so the mapping is absolute, not relative.
+      // Auto-contrast would re-brighten the ambient veil, and a few bright flame
+      // pixels would compress torch pools into one stop. Span 0.20 was measured from
+      // the lit-scene histogram at 50% ambient: shadow <0.05, ambient floor 0.05-0.10,
+      // wall caps 0.10-0.15, torch pools 0.15+ — one palette stop per band, so a pool
+      // walks the whole ramp and anything brighter clips to the top stop (no blowout).
+      // No lighting: auto-contrast as before (floor 0.34 avoids over-stretching).
+      const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
       let lo=1,hi=0;
       for(let p=0;p<N;p++){
         const i=p*4;
@@ -1035,7 +1039,7 @@ function applyGameBoy(px,scheme,colors,ramp){
     ctx.imageSmoothingEnabled=true;
   }catch(e){/* headless / no getImageData — skip */}
 }
-function applyColorClamp(scheme,colors,ramp){
+function applyColorClamp(scheme,colors,ramp,lift){
   try{
     if(scheme==='native')return;
     if(!gbBuf){ gbBuf=document.createElement('canvas'); gbCtx=gbBuf.getContext('2d',{willReadFrequently:true}); }
@@ -1048,7 +1052,8 @@ function applyColorClamp(scheme,colors,ramp){
     const len=d32.length;
     // Single pass: auto-contrast with last frame's smoothed range while measuring this
     // frame's range for next frame (avoids a second full-resolution pass).
-    const span=Math.max(_gbHi-_gbLo,0.04), base=_gbLo;
+    // lift = fixed absolute span under lighting; else auto-contrast. See applyGameBoy.
+    const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
     let lo=1,hi=0;
     for(let i=0;i<len;i++){
       const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
