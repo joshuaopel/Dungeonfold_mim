@@ -1358,6 +1358,20 @@ function feelDecay(dt){
   if(FLASH>0){ FLASH*=Math.pow(0.02,dt); if(FLASH<0.012)FLASH=0; }
 }
 function shakeOffset(){ return SHAKE>0 ? {x:(Math.random()*2-1)*SHAKE,y:(Math.random()*2-1)*SHAKE} : {x:0,y:0}; }
+/* ---------- frame-rate meter — press F3 to toggle (game and editor) ---------- */
+let _fpsPrev=0,_fpsMs=16.7,SHOW_FPS=false;
+addEventListener('keydown',e=>{ if(e.code==='F3'){ e.preventDefault(); SHOW_FPS=!SHOW_FPS; _fpsMs=16.7; } });
+function fpsFrame(now){
+  if(_fpsPrev){ const d=now-_fpsPrev; if(d>0&&d<500)_fpsMs+=(d-_fpsMs)*0.08; } // EMA; ignore tab-away gaps
+  _fpsPrev=now;
+  if(!SHOW_FPS)return;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='rgba(10,6,19,0.75)'; ctx.fillRect(vw-118,4,114,22);
+  ctx.fillStyle=_fpsMs<=17?'#8bd17c':_fpsMs<=25?'#e8c34a':'#e0635a'; // green under 60fps budget, amber, red
+  ctx.font='bold 11px monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillText(Math.round(1000/_fpsMs)+' fps '+_fpsMs.toFixed(1)+'ms',vw-10,15);
+  ctx.textAlign='start'; ctx.textBaseline='alphabetic';
+}
 const GB_SCHEMES={
   dmg:[[15,56,15],[48,98,48],[139,172,15],[155,188,15]],   // classic DMG green
   grey:[[28,28,33],[88,88,99],[156,156,170],[224,224,235]], // Pocket grey
@@ -1428,17 +1442,27 @@ function applyGameBoy(px,scheme,colors,ramp,lift){
       // wall caps 0.10-0.15, torch pools 0.15+ — one palette stop per band, so a pool
       // walks the whole ramp and anything brighter clips to the top stop (no blowout).
       // No lighting: auto-contrast as before (floor 0.34 avoids over-stretching).
-      const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
-      let lo=1,hi=0;
-      for(let p=0;p<N;p++){
-        const i=p*4;
-        const raw=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-        if(raw<lo)lo=raw; if(raw>hi)hi=raw;
-        let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
-        const o=idx<<2;
-        d[i]=lb[o]; d[i+1]=lb[o+1]; d[i+2]=lb[o+2]; d[i+3]=255;
+      if(lift){ // absolute mapping: no range measurement needed at all
+        const k=255/0.20;
+        for(let p=0;p<N;p++){
+          const i=p*4;
+          let idx=((d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255*k)|0; if(idx>255)idx=255;
+          const o=idx<<2;
+          d[i]=lb[o]; d[i+1]=lb[o+1]; d[i+2]=lb[o+2]; d[i+3]=255;
+        }
+      }else{
+        const span=Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
+        let lo=1,hi=0;
+        for(let p=0;p<N;p++){
+          const i=p*4;
+          const raw=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+          if(raw<lo)lo=raw; if(raw>hi)hi=raw;
+          let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
+          const o=idx<<2;
+          d[i]=lb[o]; d[i+1]=lb[o+1]; d[i+2]=lb[o+2]; d[i+3]=255;
+        }
+        _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       }
-      _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2; // smooth so the mapping doesn't breathe as the view scrolls
       gbCtx.putImageData(img,0,0);
     }
     ctx.setTransform(1,0,0,1,0,0);
@@ -1461,16 +1485,25 @@ function applyColorClamp(scheme,colors,ramp,lift){
     // Single pass: auto-contrast with last frame's smoothed range while measuring this
     // frame's range for next frame (avoids a second full-resolution pass).
     // lift = fixed absolute span under lighting; else auto-contrast. See applyGameBoy.
-    const span=lift?0.20:Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
-    let lo=1,hi=0;
-    for(let i=0;i<len;i++){
-      const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
-      const raw=(299*r+587*g+114*b)/255000;
-      if(raw<lo)lo=raw; if(raw>hi)hi=raw;
-      let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
-      d32[i]=lu[idx];
+    if(lift){ // absolute mapping under lighting: integer-only, no range measurement
+      for(let i=0;i<len;i++){
+        const v=d32[i];
+        // (299r+587g+114b) = lum*255000; idx = lum/0.20*255 = lum*1275 -> divide by 200
+        let idx=((299*(v&0xFF)+587*((v>>>8)&0xFF)+114*((v>>>16)&0xFF))/200)|0; if(idx>255)idx=255;
+        d32[i]=lu[idx];
+      }
+    }else{
+      const span=Math.max(_gbHi-_gbLo,0.34), base=_gbLo;
+      let lo=1,hi=0;
+      for(let i=0;i<len;i++){
+        const v=d32[i],r=v&0xFF,g=(v>>>8)&0xFF,b=(v>>>16)&0xFF;
+        const raw=(299*r+587*g+114*b)/255000;
+        if(raw<lo)lo=raw; if(raw>hi)hi=raw;
+        let idx=((raw-base)/span)*255; idx=idx<0?0:idx>255?255:idx|0;
+        d32[i]=lu[idx];
+      }
+      _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     }
-    _gbLo+=(lo-_gbLo)*0.2; _gbHi+=(hi-_gbHi)*0.2;
     gbCtx.putImageData(img,0,0);
     ctx.setTransform(1,0,0,1,0,0);
     ctx.drawImage(gbBuf,0,0);
@@ -1503,7 +1536,12 @@ function drawGbPops(t,editor){
   if(tre)for(const o of tre){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawTreasureAt(editor?{...o,bob:0}:o, editor?0:t),o.x,o.y,44]); }
   if(prp)for(const o of prp){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawPropAt(o.kind,o.x,o.y,editor?0:t,false,o),o.x,o.y,70]); }
   if(her)for(const o of her){ const v=gbPopVal(o&&o.gbPop); if(v)items.push([v,()=>drawHeroAt(editor?{...o,ang:0}:o, editor?0:t),o.x,o.y,70]); }
-  if(!editor&&typeof G!=='undefined'&&G&&G.player&&level.gb){ const v=gbPopVal(level.gb.player); if(v)items.push([v,()=>drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid}),G.player.x,G.player.y,70]); }
+  if(!editor&&typeof G!=='undefined'&&G&&G.player&&level.gb){
+    // The player ALWAYS renders properly (whatever form they've morphed into):
+    // unset/legacy 0 defaults to the scene-palette pop; 'off' is the explicit opt-out.
+    let pv=level.gb.player; if(pv==null||pv===0||pv==='0')pv='scene*'; else if(pv==='off')pv=0;
+    const v=gbPopVal(pv); if(v)items.push([v,()=>drawPropAt(G.player.form,G.player.x,G.player.y,t,true,{aid:G.player.formAid}),G.player.x,G.player.y,70]);
+  }
   if(!items.length) return;
   for(const it of items) if(it[0]==='full') it[1]();           // crisp full-colour: straight on top
   const off=items.filter(it=>it[0]!=='full');                   // everything needing the offscreen pass
@@ -3278,6 +3316,7 @@ function frame(now){
     ctx.setTransform(1,0,0,1,0,0);
     ctx.fillStyle='#120c1d';ctx.fillRect(0,0,vw,vh);
   }
+  fpsFrame(now);
   requestAnimationFrame(frame);
 }
 /* ---------- repo campaign: levels/manifest.json defines the level flow ---------- */
