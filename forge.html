@@ -1019,8 +1019,8 @@ function checkRace(){
   const carried=G.heroes.reduce((s,h)=>s+(h.load?loadVal(h):0),0);
   if(G.goalValue+worldLeft+carried < G.goal) loseRace();
 }
-function loseRace(){ if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
-function lose(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
+function loseRace(){ if(typeof endDemo==='function'&&G&&G.demo){endDemo();return;} if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
+function lose(h){if(typeof endDemo==='function'&&G&&G.demo){endDemo();return;} if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
 function cdBar(id,frac){
   const el=document.getElementById(id);
   el.querySelector('.cd').style.height=(frac*100)+'%';

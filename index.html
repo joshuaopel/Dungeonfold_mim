@@ -1024,8 +1024,8 @@ function checkRace(){
   const carried=G.heroes.reduce((s,h)=>s+(h.load?loadVal(h):0),0);
   if(G.goalValue+worldLeft+carried < G.goal) loseRace();
 }
-function loseRace(){ if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
-function lose(h){if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
+function loseRace(){ if(typeof endDemo==='function'&&G&&G.demo){endDemo();return;} if(G.over)return; G.over=true; sfx('lose'); addShake(10); addFlash('255,55,55',0.6); showEnd(false,{name:'__race__'}); }
+function lose(h){if(typeof endDemo==='function'&&G&&G.demo){endDemo();return;} if(G.over)return;G.over=true;sfx('lose');addShake(13);addFlash('255,55,55',0.7);showEnd(false,h);}
 function cdBar(id,frac){
   const el=document.getElementById(id);
   el.querySelector('.cd').style.height=(frac*100)+'%';
@@ -2653,9 +2653,48 @@ function toggleFullscreen(){
     else if(document.documentElement&&document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();
   }catch(e){}
 }
-addEventListener('blur',()=>{ if(MODE==='play'&&G&&!G.over&&!G.paused&&!CUT)togglePause(true); });
+addEventListener('blur',()=>{ if(MODE==='play'&&G&&!G.over&&!G.paused&&!CUT&&!G.demo)togglePause(true); });
 addEventListener('gamepadconnected',()=>{padActive=true;updateControlGlyphs();});
 addEventListener('gamepaddisconnected',()=>{});
+/* ---------- attract mode: idle on the title long enough and a CPU demo plays ---------- */
+let idleT=0;
+const titleVisible=()=>{ const t=document.getElementById('titleScreen'); return t&&!t.classList.contains('hidden'); };
+addEventListener('pointerdown',()=>{ if(G&&G.demo){endDemo();return;} idleT=0; });
+addEventListener('pointermove',()=>{ idleT=0; });
+addEventListener('wheel',()=>{ idleT=0; });
+function startDemo(){
+  const i=roster.findIndex(en=>!en.locked&&en.data);
+  if(i<0){ idleT=0; return; }
+  playIndex(i,true);
+  if(G){ G.demo=true; G.demoT=0; G.showMap=false; }
+}
+function endDemo(){
+  if(!(G&&G.demo))return;
+  stopMusic();
+  G=null; MODE='menu'; idleT=0;
+  refreshLevelList(); showScreen('titleScreen');
+}
+function demoDrive(dt){
+  const p=G.player;
+  G.demoT+=dt;
+  if(G.demoT>45){ endDemo(); return {x:0,y:0}; }
+  let nd=1e9; for(const h of G.heroes){ const d=dist(h,p); if(d<nd)nd=d; }
+  if(nd<210){ if(p.form==='mimic')tryMorph(); return {x:0,y:0}; } // hold still in disguise near danger
+  let tgt=null,td=1e9;
+  for(const t of G.treasures){ if(t.taken)continue; const d=dist(t,p); if(d<td){td=d;tgt=t;} }
+  if(!tgt)tgt=G.portal;
+  if(tgt!==G.portal&&td<38)tryGrab();
+  G.demoRepath=(G.demoRepath||0)-dt;
+  if(!G.demoRoute||G.demoRepath<=0||!G.demoGoal||dist(G.demoGoal,tgt)>4){
+    G.demoRoute=aStar(p,tgt,false)||[{x:tgt.x,y:tgt.y}];
+    G.demoI=0; G.demoRepath=1.4; G.demoGoal={x:tgt.x,y:tgt.y};
+  }
+  let wp=G.demoRoute[G.demoI];
+  while(wp&&dist(p,wp)<26&&G.demoI<G.demoRoute.length-1){ G.demoI++; wp=G.demoRoute[G.demoI]; }
+  if(!wp)return {x:0,y:0};
+  const a=Math.atan2(wp.y-p.y,wp.x-p.x);
+  return {x:Math.cos(a),y:Math.sin(a)};
+}
 function playIndex(i,skipIntro){
   if(i<0||i>=roster.length)return;
   currentIdx=i;
@@ -2764,6 +2803,8 @@ addEventListener('keydown',e=>{
   const B=SAVE.settings.binds;
   if(MODE==='play'&&[B.up,B.down,B.left,B.right,B.grab,B.sneak,'ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
   keys[e.code]=true;
+  idleT=0;
+  if(G&&G.demo){endDemo();return;}
   if(MODE==='play'&&G&&!G.over&&(e.code===B.pause||e.code==='KeyP')){togglePause();return;}
   if(MODE!=='play'||!G||G.over||G.paused)return;
   if(e.code===B.morph)tryMorph();
@@ -3029,7 +3070,7 @@ function updateHero(h,dt){
     }
   }
 }
-function win(){if(G.over)return;G.over=true;sfx('win');playCutscene(level.outro,()=>showEnd(true,null));}
+function win(){if(G&&G.demo){endDemo();return;} if(G.over)return;G.over=true;sfx('win');playCutscene(level.outro,()=>showEnd(true,null));}
 
 /* ---------- update ---------- */
 function updatePlay(dt){
@@ -3040,6 +3081,7 @@ function updatePlay(dt){
   let mx=((keys[B.right]||keys.ArrowRight)?1:0)-((keys[B.left]||keys.ArrowLeft)?1:0),my=((keys[B.down]||keys.ArrowDown)?1:0)-((keys[B.up]||keys.ArrowUp)?1:0);
   mx+=stickVec.x;my+=stickVec.y;
   mx+=padVec.x;my+=padVec.y;
+  if(G.demo){ const dv=demoDrive(dt); mx=dv.x; my=dv.y; }
   const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}
   p.sneak=(keys[B.sneak]||keys.ShiftLeft||keys.ShiftRight||sneakToggle||padSneak);
   if(p.rollT>0){ p.rollT-=dt; mx=Math.cos(p.rollDir); my=Math.sin(p.rollDir); p.sneak=false; } // barrel roll: committed dash
@@ -3329,6 +3371,13 @@ function renderPlay(t){
   cam.x=_cx; cam.y=_cy;
   if(G.showMap)drawMinimap();
   if(FLASH>0){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='rgba('+FLASHCOL+','+(FLASH*0.5).toFixed(3)+')'; ctx.fillRect(0,0,vw,vh); }
+  if(G.demo){ ctx.setTransform(1,0,0,1,0,0);
+    if(((performance.now()/500)|0)%2===0){
+      ctx.fillStyle='rgba(8,4,14,0.8)'; ctx.fillRect(vw/2-200,vh-118,400,34);
+      ctx.font='15px PressStart, monospace'; ctx.textAlign='center'; ctx.fillStyle='#dab84e';
+      ctx.fillText('DEMO — PRESS ANY KEY',vw/2,vh-95); ctx.textAlign='start';
+    }
+  }
 }
 function drawMinimap(){
   const mw=170,sc=mw/(level.cols*TS),mh=level.rows*TS*sc;
@@ -3412,6 +3461,7 @@ function frame(now){
   const dt=Math.min((now-last)/1000,0.05);last=now;
   const t=now/1000;
   pollPad();
+  if(MODE==='menu'&&titleVisible()){ idleT+=dt; if(idleT>22)startDemo(); }
   if(MODE==='play'&&G){ if(!G.paused){ if(HITSTOP>0)HITSTOP-=dt; else updatePlay(dt); } renderPlay(t); feelDecay(dt); }
   else{
     ctx.setTransform(1,0,0,1,0,0);
