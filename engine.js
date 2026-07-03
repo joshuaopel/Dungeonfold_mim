@@ -1358,6 +1358,84 @@ function drawGbTorchFx(t){
   }
 }
 
+/* ---------- NPCs: friendly characters with paged dialog ----------
+   Dialog pages come from n.lines (one page per line). The world freezes
+   while a dialog is open (updatePlay gates on G.dialog); the box, name,
+   typewriter text and advance arrow all draw post-filter, crisp. */
+function drawNpcAt(n,t){
+  ctx.save();ctx.translate(n.x,n.y);
+  const bob=Math.sin(t*2+(n.x||0)*0.05)*1.5;
+  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(0,14,11,4.5,0,0,TAU);ctx.fill();
+  const im=n.aid&&assetImgs[n.aid];
+  if(im){
+    const fw=im.frameW||im.width, sx=stripSX(im,n.x*0.05,performance.now()/1000), s=40/Math.max(fw,im.height);
+    ctx.drawImage(im,sx,0,fw,im.height,-fw*s/2,-im.height*s/2+bob*0.4,fw*s,im.height*s);
+    ctx.restore();return;
+  }
+  // hooded robe figure with lantern-glow eyes
+  ctx.fillStyle='#4a3a60';ctx.beginPath();ctx.moveTo(-11,14);ctx.quadraticCurveTo(-13,-6,0,-16+bob);ctx.quadraticCurveTo(13,-6,11,14);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#372b49';ctx.fillRect(-11,11,22,3);
+  ctx.fillStyle='#171021';ctx.beginPath();ctx.ellipse(0,-6+bob,6.5,7,0,0,TAU);ctx.fill();
+  ctx.fillStyle='#e8c95e';ctx.fillRect(-4,-8+bob,2,2);ctx.fillRect(2,-8+bob,2,2);
+  ctx.strokeStyle='#8a8199';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-8,3);ctx.quadraticCurveTo(0,6,8,3);ctx.stroke();
+  ctx.restore();
+}
+function npcNear(){
+  if(typeof G==='undefined'||!G||!G.npcs)return null;
+  const p=G.player; let best=null,bd=52;
+  for(const n of G.npcs){ const d=dist(n,p); if(d<bd){bd=d;best=n;} }
+  return best;
+}
+function openDialog(n){
+  const pages=String(n.lines||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!pages.length)return false;
+  G.dialog={npc:n,pages,page:0,chars:0};
+  sfx('click');
+  return true;
+}
+function advanceDialog(){
+  const d=G.dialog; if(!d)return;
+  const cur=d.pages[d.page];
+  if(d.chars<cur.length){ d.chars=cur.length; return; }   // finish the typewriter first
+  if(d.page+1<d.pages.length){ d.page++; d.chars=0; sfx('click'); }
+  else G.dialog=null;
+}
+function updateDialog(dt){
+  const d=G.dialog; if(!d)return;
+  const cur=d.pages[d.page];
+  if(d.chars<cur.length)d.chars=Math.min(cur.length,d.chars+dt*45);
+}
+function drawTalkPrompt(n,t){
+  const y=n.y-36+Math.sin(t*4)*2;
+  ctx.fillStyle='rgba(12,8,18,0.9)';ctx.fillRect(n.x-9,y-9,18,18);
+  ctx.strokeStyle='#8a8199';ctx.lineWidth=1.5;ctx.strokeRect(n.x-9,y-9,18,18);
+  ctx.fillStyle='#dab84e';ctx.font='10px PressStart, monospace';ctx.textAlign='center';
+  ctx.fillText('!',n.x,y+4);ctx.textAlign='start';
+}
+function drawDialog(){
+  const d=(typeof G!=='undefined'&&G)?G.dialog:null; if(!d)return;
+  ctx.setTransform(1,0,0,1,0,0);
+  const w=Math.min(620,vw-32),h=104,x=(vw-w)/2,y=vh-h-100;
+  ctx.fillStyle='rgba(12,8,18,0.94)';ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='#8a8199';ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
+  ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=1;ctx.strokeRect(x+3,y+3,w-6,h-6);
+  ctx.fillStyle='#dab84e';ctx.font='10px PressStart, monospace';ctx.textAlign='left';
+  ctx.fillText(String(d.npc.name||'???').toUpperCase().slice(0,24),x+14,y+21);
+  ctx.fillStyle='#d4cedd';ctx.font='13px Silkscreen, monospace';
+  const full=d.pages[d.page], shown=full.slice(0,Math.floor(d.chars));
+  let line='',ly=y+44; const maxW=w-28;
+  for(const word of shown.split(' ')){
+    const test=line?line+' '+word:word;
+    if(ctx.measureText(test).width>maxW&&line){ ctx.fillText(line,x+14,ly); ly+=18; line=word; }
+    else line=test;
+  }
+  ctx.fillText(line,x+14,ly);
+  if(d.chars>=full.length&&(((performance.now()/400)|0)%2===0)){
+    ctx.fillStyle='#dab84e';ctx.font='10px PressStart, monospace';
+    ctx.fillText(d.page+1<d.pages.length?'\u25bc':'\u25a0',x+w-26,y+h-12);
+  }
+  ctx.textAlign='start';
+}
 function drawPortalAt(p,active,t){
   const W=36, half=W/2;
   ctx.save(); ctx.translate(p.x,p.y);
