@@ -303,9 +303,9 @@ buildTileCache();
    Triggers (plate/lever) INVERT the starting state of any
    linked target (door/trap) while active.
    ========================================================= */
-const INTER_KINDS={door:1,plate:1,lever:1,trap:1,hint:1};
-const INTER_TILED={door:1,plate:1,trap:1};
-const TOOL_INTER={iDoor:'door',iPlate:'plate',iLever:'lever',iTrap:'trap',iHint:'hint'};
+const INTER_KINDS={door:1,plate:1,lever:1,trap:1,hint:1,vent:1};
+const INTER_TILED={door:1,plate:1,trap:1,vent:1};
+const TOOL_INTER={iDoor:'door',iPlate:'plate',iLever:'lever',iTrap:'trap',iHint:'hint',iVent:'vent'};
 let doorBlock={};
 let propBlock={};            // tiles occupied by pushable props — blocks heroes, not the player (player uses circle push)
 const tileKey=(c,r)=>c+','+r;
@@ -314,6 +314,15 @@ const walkTileNP=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c
 const walkTileSack=(c,r)=>isFloorT(T(level,c,r))&&!objBlock[c+','+r]; // sack quirk: slips under closed doors (walls still block)
 const interTile=it=>({c:Math.floor(it.x/TS),r:Math.floor(it.y/TS)});
 function drawInter(it,st){
+  if(it.kind==='vent'){ // mouse hole: a dark arch small forms can slip through
+    ctx.save();ctx.translate(it.x,it.y);
+    ctx.fillStyle='rgba(0,0,0,0.30)';ctx.beginPath();ctx.ellipse(0,10,14,4,0,0,TAU);ctx.fill();
+    ctx.fillStyle='#171021';ctx.beginPath();ctx.arc(0,8,13,Math.PI,0,false);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#060309';ctx.beginPath();ctx.arc(0,8,9,Math.PI,0,false);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(180,170,200,0.35)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(0,8,13,Math.PI,0,false);ctx.stroke();
+    ctx.restore();return;
+  }
   if(it.kind==='hint'){
     ctx.save();ctx.translate(it.x,it.y);
     ctx.fillStyle='#6b4a2c';ctx.fillRect(-2,-3,4,16);
