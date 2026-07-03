@@ -1329,6 +1329,7 @@ function buildLightmap(t,camX,camY,zoom){
   }
   if(typeof G!=='undefined'&&G&&(typeof MODE==='undefined'||MODE==='play')){
     if(G.player)addLight(G.player.x,G.player.y,150,150,170,225,0.55);
+    if(G.heroes)for(const h of G.heroes)if(hasAbil(h,'lantern'))addLight(h.x,h.y,155,255,196,110,0.85); // lantern-bearers carry their own pool of light
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
@@ -3295,7 +3296,7 @@ document.getElementById('fileImport').onchange=e=>{
        level.objects=(Array.isArray(level.objects)?level.objects:[]).filter(o=>o&&ids.has(o.d)).map(o=>({d:o.d,x:+o.x||0,y:+o.y||0,r:+o.r||0,f:o.f?1:0}));}
       level.odn=Math.max(0,+level.odn||0);
       level.mode=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
-      { const ABILS=['lockpick','keensight','sprinter','fearless','alarm'];
+      { const ABILS=['lockpick','keensight','sprinter','fearless','alarm','lantern'];
         level.enemyDefs=(Array.isArray(level.enemyDefs)?level.enemyDefs:[]).map((e,i)=>({
           id:String((e&&e.id)||('e'+i)), name:String((e&&e.name)||'Enemy').slice(0,40),
           base:(e&&['fighter','rogue','wizard'].includes(e.base)?e.base:'fighter'),
@@ -3634,7 +3635,7 @@ function poof(x,y,color,n=10){
    ========================================================= */
 function heroCanSee(h){
   const p=G.player,d=dist(h,p);
-  if(d>h.cone.len) return false;
+  if(d>(h.cone.eff||h.cone.len)) return false;
   if(Math.abs(angDiff(h.ang,angTo(h,p)))>h.cone.fov) return false;
   if(sightBlocked(h,p,G.props)) return false;
   return true;
@@ -3667,6 +3668,20 @@ function navTo(h,goal,speed,dt,repathDist){
 }
 function updateHero(h,dt){
   const p=G.player,f=FORMS[p.form];
+  { // darkness shrinks vision: heroes see by light. Lantern-bearers carry theirs;
+    // others rely on ambient + nearby lit torches — douse those and they're near-blind.
+    const amb=(level.ambient==null?0:level.ambient);
+    if(amb>0&&!hasAbil(h,'lantern')){
+      let n=0;
+      for(const to of G.torches){ if(torchLit(to)&&dist(h,to)<(to.radius||190)*0.85)n++; }
+      if(h._litN!=null&&n<h._litN&&h.state!=='chase'&&h.state!=='scared'){
+        h.suspicion=clamp(h.suspicion+25,0,100);
+        say(h,pick(['Who doused the light?!','Hey — the torch!','I don\'t like this darkness…']));
+      }
+      h._litN=n;
+      h.cone.eff=h.cone.len*clamp(0.35+(1-amb)*0.65+(n>0?0.65:0),0.35,1);
+    } else h.cone.eff=h.cone.len;
+  }
   const seen=heroCanSee(h);
   if(seen&&G.mode==='ghost'){loseSeen(h);return;}   // strict ghost: entering any hero's vision cone ends it, disguise or not
   let gain;
@@ -3920,8 +3935,9 @@ function drawCone(h){
   for(let i=0;i<=N;i++){
     const a=h.ang-h.cone.fov+(2*h.cone.fov)*i/N;
     const ca=Math.cos(a),sa=Math.sin(a);
+    const L=h.cone.eff||h.cone.len;
     let d=14;
-    while(d<h.cone.len){
+    while(d<L){
       const x=h.x+ca*d,y=h.y+sa*d;
       if(solidAtXY(level,x,y))break;
       let hit=false;
@@ -3932,7 +3948,7 @@ function drawCone(h){
       if(hit)break;
       d+=12;
     }
-    const dd=Math.min(d,h.cone.len);
+    const dd=Math.min(d,L);
     ctx.lineTo(h.x+ca*dd,h.y+sa*dd);
   }
   ctx.closePath();ctx.fill();
@@ -4273,7 +4289,7 @@ function tryRestoreDraft(){
        level.objects=(Array.isArray(level.objects)?level.objects:[]).filter(o=>o&&ids.has(o.d)).map(o=>({d:o.d,x:+o.x||0,y:+o.y||0,r:+o.r||0,f:o.f?1:0}));}
       level.odn=Math.max(0,+level.odn||0);
       level.mode=(['plunder','ghost'].includes(level.mode))?level.mode:'heist';
-      { const ABILS=['lockpick','keensight','sprinter','fearless','alarm'];
+      { const ABILS=['lockpick','keensight','sprinter','fearless','alarm','lantern'];
         level.enemyDefs=(Array.isArray(level.enemyDefs)?level.enemyDefs:[]).map((e,i)=>({
           id:String((e&&e.id)||('e'+i)), name:String((e&&e.name)||'Enemy').slice(0,40),
           base:(e&&['fighter','rogue','wizard'].includes(e.base)?e.base:'fighter'),

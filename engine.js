@@ -990,6 +990,7 @@ function buildLightmap(t,camX,camY,zoom){
   }
   if(typeof G!=='undefined'&&G&&(typeof MODE==='undefined'||MODE==='play')){
     if(G.player)addLight(G.player.x,G.player.y,150,150,170,225,0.55);
+    if(G.heroes)for(const h of G.heroes)if(hasAbil(h,'lantern'))addLight(h.x,h.y,155,255,196,110,0.85); // lantern-bearers carry their own pool of light
     if(G.decoys)for(const d of G.decoys)if(d.t>0)addLight(d.x,d.y,90,255,210,120,0.5*Math.min(1,d.t));
     if(G.inter)for(const it of G.inter)if(it.kind==='trap'&&it.on)addLight(it.x,it.y,70,180,220,255,0.4);
   }
