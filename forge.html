@@ -399,11 +399,11 @@ function hiss(o){
 }
 const FORMS={
   mimic:{label:'Mimic',hint:'True form — heroes attack on sight!',speed:185,r:16,stealth:1.0},
-  sack:{label:'Sack',hint:'Tiny & sneaky, but slow',speed:105,r:13,stealth:0.65},
-  vase:{label:'Vase',hint:'Small, fragile-looking, sneaky',speed:100,r:12,stealth:0.65},
-  barrel:{label:'Barrel',hint:'Balanced rolling speed',speed:145,r:15,stealth:1.0},
-  chest:{label:'Chest',hint:'A classic. Suspiciously classic.',speed:135,r:16,stealth:1.05},
-  statue:{label:'Statue',hint:'Very slow — but invisible when still',speed:65,r:20,stealth:1.3},
+  sack:{label:'Sack',hint:'Tiny & sneaky — slips under closed doors',speed:105,r:13,stealth:0.65},
+  vase:{label:'Vase',hint:'Sneaky. Ability: shatter loudly — instant diversion',speed:100,r:12,stealth:0.65},
+  barrel:{label:'Barrel',hint:'Ability: roll — a fast, noisy dash',speed:145,r:15,stealth:1.0},
+  chest:{label:'Chest',hint:'A classic. Ability: snap at looters',speed:135,r:16,stealth:1.05},
+  statue:{label:'Statue',hint:'Very slow — invisible while still, even to rogues',speed:65,r:20,stealth:1.3},
 };
 const PROP_KINDS=['sack','vase','barrel','chest','statue'];
 const OCCL={barrel:13,chest:14,statue:18};
@@ -650,6 +650,7 @@ let propBlock={};            // tiles occupied by pushable props — blocks hero
 const tileKey=(c,r)=>c+','+r;
 const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r]&&!propBlock[c+','+r];
 const walkTileNP=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];  // ignores pushable props (for player + the props themselves)
+const walkTileSack=(c,r)=>isFloorT(T(level,c,r))&&!objBlock[c+','+r]; // sack quirk: slips under closed doors (walls still block)
 const interTile=it=>({c:Math.floor(it.x/TS),r:Math.floor(it.y/TS)});
 function drawInter(it,st){
   if(it.kind==='hint'){
@@ -1026,6 +1027,8 @@ function updateFormHUD(){
   const f=FORMS[G.player.form];
   document.getElementById('formName').textContent=f.label;
   document.getElementById('formHint').textContent=f.hint;
+  const abn=document.querySelector('#abSnap .nm'); // the R chip names the current form's quirk
+  if(abn)abn.textContent=(G.player.form==='barrel')?'Roll':(G.player.form==='vase')?'Shatter':'Chest Snap';
 }
 function shadowAt(r){ctx.fillStyle='rgba(0,0,0,0.30)';ctx.beginPath();ctx.ellipse(0,14,r,r*0.4,0,0,TAU);ctx.fill();}
 function rrect(x,y,w,h,r){
@@ -3420,7 +3423,7 @@ function startPlay(fromEditor){
     props:level.props.map(p=>({...p,wob:rnd(0,TAU)})),
     decoys:[], particles:[], bubbles:[], pulses:[],
     player:{x:level.spawn.x,y:level.spawn.y,form:'chest',sneak:false,face:0,moving:false,
-            eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,artifactBoost:false,r:16,integrity:100,crackT:0},
+            eyeBlink:rnd(1,3),cdDecoy:0,cdSnap:0,snapAnim:0,rollT:0,rollDir:0,artifactBoost:false,r:16,integrity:100,crackT:0},
     portal:{x:level.portal.x,y:level.portal.y,r:34,active:(level.mode==='ghost'),spin:0},
     runTime:0, detections:0, chaos:0, goalValue:0, decoyId:0, mode:level.mode||'heist', invaderLoot:0, gb:level.gb||{on:false,scheme:'dmg',px:5,pixelate:true},
     goal:Math.min(level.goal,Math.max(total,1)), showMap:true, over:false, stepKey:'',
@@ -3548,8 +3551,24 @@ function tryDecoy(){
   p.cdDecoy=10; sfx('decoy');
   G.decoys.push({x:p.x,y:p.y,t:6,sparkT:0,id:G.decoyId++});
 }
-function trySnap(){
+function trySnap(){ // R = the current form's quirk
   const p=G.player;
+  if(p.form==='barrel'){                 // roll: locked-direction dash — fast and loud
+    if(p.cdSnap>0)return;
+    p.cdSnap=6;p.rollT=0.55;p.rollDir=p.face;
+    sfx('decoy');noiseAt(p.x,p.y,0.7);poof(p.x,p.y,'#a8794a',8);
+    return;
+  }
+  if(p.form==='vase'){                   // shatter: sacrifice the disguise as a loud lure
+    sfx('trap');addShake(4);
+    poof(p.x,p.y,'#8fb4c9',16);
+    noiseAt(p.x,p.y,1.6);
+    p.form='mimic';p.formAid=undefined;p.integrity=100;p.crackT=0;
+    p.cdSnap=Math.max(p.cdSnap,1.5);
+    updateFormHUD();
+    return;
+  }
+  if(p.form!=='chest')return;            // the snap belongs to the chest
   if(p.cdSnap>0) return;
   p.cdSnap=20; p.snapAnim=0.5; sfx('snap'); addShake(7);addHitStop(0.06);addFlash('255,235,200',0.28);
   poof(p.x,p.y,PAL.tooth,16);
@@ -3617,7 +3636,7 @@ function updateHero(h,dt){
   if(seen){
     if(p.form==='mimic') gain=95;
     else if(p.moving) gain=42*f.stealth*(p.sneak?0.35:1)*h.perc*(1+(1-p.integrity/100)*0.9);
-    else gain=(h.kind==='rogue')?7:0;
+    else gain=(h.kind==='rogue'&&p.form!=='statue')?7:0; // statue quirk: even a rogue can't read a statue
     h.lastSeen={x:p.x,y:p.y};
   } else gain=-15;
   if(h.state==='scared'||h.state==='lured') gain=Math.min(gain,0);
@@ -3713,9 +3732,10 @@ function updatePlay(dt){
   mx+=stickVec.x;my+=stickVec.y;
   const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}
   p.sneak=(keys.ShiftLeft||keys.ShiftRight||sneakToggle);
-  const spd=f.speed*(p.sneak?0.55:1)*(p.artifactBoost?1.18:1);
+  if(p.rollT>0){ p.rollT-=dt; mx=Math.cos(p.rollDir); my=Math.sin(p.rollDir); p.sneak=false; } // barrel roll: committed dash
+  const spd=(p.rollT>0)?430:f.speed*(p.sneak?0.55:1)*(p.artifactBoost?1.18:1);
   p.x+=mx*spd*dt;p.y+=my*spd*dt;
-  p.moving=m>0.1;
+  p.moving=m>0.1||p.rollT>0;
   if(p.moving)p.face=Math.atan2(my,mx);
   if(p.crackT>0)p.crackT-=dt;
   if(p.form!=='mimic'){
@@ -3729,7 +3749,7 @@ function updatePlay(dt){
   } else { p.integrity=100; }
   p.r=f.r;
   resolvePush(p);
-  collideTiles(p,walkTileNP);
+  collideTiles(p,(p.form==='sack')?walkTileSack:walkTileNP); // sack quirk: slips under closed doors
 
   /* camera deadzone follow */
   const dzx=vw*0.30,dzy=vh*0.30;
@@ -3769,7 +3789,7 @@ function updatePlay(dt){
   if(G.portal.active&&dist(p,G.portal)<G.portal.r+f.r-6) win();
 
   document.getElementById('timer').textContent=fmtTime(G.runTime);
-  cdBar('abDecoy',p.cdDecoy/10);cdBar('abSnap',p.cdSnap/20);
+  cdBar('abDecoy',p.cdDecoy/10);cdBar('abSnap',p.cdSnap/(G.player.form==='barrel'?6:20));
   updateTension();
 }
 let TENS_OSC=null,TENS_GAIN=null;

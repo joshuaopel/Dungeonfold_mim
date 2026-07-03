@@ -60,11 +60,11 @@ function hiss(o){
 }
 const FORMS={
   mimic:{label:'Mimic',hint:'True form — heroes attack on sight!',speed:185,r:16,stealth:1.0},
-  sack:{label:'Sack',hint:'Tiny & sneaky, but slow',speed:105,r:13,stealth:0.65},
-  vase:{label:'Vase',hint:'Small, fragile-looking, sneaky',speed:100,r:12,stealth:0.65},
-  barrel:{label:'Barrel',hint:'Balanced rolling speed',speed:145,r:15,stealth:1.0},
-  chest:{label:'Chest',hint:'A classic. Suspiciously classic.',speed:135,r:16,stealth:1.05},
-  statue:{label:'Statue',hint:'Very slow — but invisible when still',speed:65,r:20,stealth:1.3},
+  sack:{label:'Sack',hint:'Tiny & sneaky — slips under closed doors',speed:105,r:13,stealth:0.65},
+  vase:{label:'Vase',hint:'Sneaky. Ability: shatter loudly — instant diversion',speed:100,r:12,stealth:0.65},
+  barrel:{label:'Barrel',hint:'Ability: roll — a fast, noisy dash',speed:145,r:15,stealth:1.0},
+  chest:{label:'Chest',hint:'A classic. Ability: snap at looters',speed:135,r:16,stealth:1.05},
+  statue:{label:'Statue',hint:'Very slow — invisible while still, even to rogues',speed:65,r:20,stealth:1.3},
 };
 const PROP_KINDS=['sack','vase','barrel','chest','statue'];
 const OCCL={barrel:13,chest:14,statue:18};
@@ -311,6 +311,7 @@ let propBlock={};            // tiles occupied by pushable props — blocks hero
 const tileKey=(c,r)=>c+','+r;
 const walkTile=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r]&&!propBlock[c+','+r];
 const walkTileNP=(c,r)=>isFloorT(T(level,c,r))&&!doorBlock[c+','+r]&&!objBlock[c+','+r];  // ignores pushable props (for player + the props themselves)
+const walkTileSack=(c,r)=>isFloorT(T(level,c,r))&&!objBlock[c+','+r]; // sack quirk: slips under closed doors (walls still block)
 const interTile=it=>({c:Math.floor(it.x/TS),r:Math.floor(it.y/TS)});
 function drawInter(it,st){
   if(it.kind==='hint'){
@@ -687,6 +688,8 @@ function updateFormHUD(){
   const f=FORMS[G.player.form];
   document.getElementById('formName').textContent=f.label;
   document.getElementById('formHint').textContent=f.hint;
+  const abn=document.querySelector('#abSnap .nm'); // the R chip names the current form's quirk
+  if(abn)abn.textContent=(G.player.form==='barrel')?'Roll':(G.player.form==='vase')?'Shatter':'Chest Snap';
 }
 function shadowAt(r){ctx.fillStyle='rgba(0,0,0,0.30)';ctx.beginPath();ctx.ellipse(0,14,r,r*0.4,0,0,TAU);ctx.fill();}
 function rrect(x,y,w,h,r){
