@@ -2600,6 +2600,17 @@ function renderSelProps(s,pool){
   } else if(s.kind==='lever'){
     checkbox('Starts on',()=>s.init,v=>s.init=v?1:0);
   }
+  if(pool==='heroes'&&s){
+    any=true;
+    const lab=document.createElement('div'); lab.className='inspLab'; lab.textContent='Idle chatter (one line per row)'; row.appendChild(lab);
+    const ta=document.createElement('textarea');
+    ta.value=s.chat||''; ta.placeholder='Guard duty again…\nDid you hear about the mimic?\nI miss the tavern.';
+    ta.oninput=()=>{ s.chat=ta.value.slice(0,400); };
+    row.appendChild(ta);
+    const tip=document.createElement('div'); tip.className='inspTip';
+    tip.textContent='Spoken at random while this hero patrols calmly. Leave empty for the strong silent type.';
+    row.appendChild(tip);
+  }
   if(pool!=='torches' && s && PROP_KINDS.includes(s.kind)){
     checkbox('Pushable — Mim can shove it onto plates or to block a path',()=>s.push,v=>s.push=v?1:0);
   }
@@ -3438,7 +3449,7 @@ function startPlay(fromEditor){
       path:h.path.map(p=>({...p})), r:17, ang:rnd(0,TAU), suspicion:0, state:'patrol', wp:0,
       pauseT:0, poi:null, lastSeen:null, loseT:0, lureT:0, lure:null, scareT:0, fooled:{},
       home:{x:h.x,y:h.y}, scanDir:1, load:[], cap:d.capacity, carrySlow:d.carrySlow, abil:d.abil, pickDoor:null, pickT:0,
-      route:null, routeI:0, routeGoal:null, repathT:0, hearing:d.hearing };
+      route:null, routeI:0, routeGoal:null, repathT:0, hearing:d.hearing, chat:h.chat||'', chatT:rnd(4,12) };
   });
   const total=level.treasures.reduce((s,t)=>s+TREASURE_VAL[t.kind],0);
   G={ heroes,
@@ -3681,6 +3692,14 @@ function updateHero(h,dt){
       h._litN=n;
       h.cone.eff=h.cone.len*clamp(0.35+(1-amb)*0.65+(n>0?0.65:0),0.35,1);
     } else h.cone.eff=h.cone.len;
+  }
+  if(h.chat&&h.state==='patrol'&&h.suspicion<30){ // idle banter, authored per hero in the Forge
+    h.chatT-=dt;
+    if(h.chatT<=0){
+      const ls=h.chat.split('\n').map(x=>x.trim()).filter(Boolean);
+      if(ls.length)say(h,ls[(Math.random()*ls.length)|0].slice(0,60));
+      h.chatT=rnd(9,18);
+    }
   }
   const seen=heroCanSee(h);
   if(seen&&G.mode==='ghost'){loseSeen(h);return;}   // strict ghost: entering any hero's vision cone ends it, disguise or not
