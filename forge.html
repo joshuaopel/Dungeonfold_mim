@@ -1367,6 +1367,31 @@ function feelDecay(dt){
   if(FLASH>0){ FLASH*=Math.pow(0.02,dt); if(FLASH<0.012)FLASH=0; }
 }
 function shakeOffset(){ return SHAKE>0 ? {x:(Math.random()*2-1)*SHAKE,y:(Math.random()*2-1)*SHAKE} : {x:0,y:0}; }
+/* ---------- CRT overlay — scanlines + corner vignette, toggled by the client ---------- */
+let CRT_ON=false,_crtPat=null,_crtVig=null,_crtW=0,_crtH=0;
+function applyCrt(){
+  if(!CRT_ON)return;
+  try{
+    if(!_crtPat){
+      const c=document.createElement('canvas'); c.width=4; c.height=3;
+      const g=c.getContext('2d');
+      g.fillStyle='rgba(0,0,0,0.16)'; g.fillRect(0,2,4,1);   // one dark line per 3px
+      _crtPat=ctx.createPattern(c,'repeat');
+    }
+    if(!_crtVig||_crtW!==vw||_crtH!==vh){
+      _crtW=vw;_crtH=vh;
+      const v=document.createElement('canvas'); v.width=vw; v.height=vh;
+      const g=v.getContext('2d');
+      const rg=g.createRadialGradient(vw/2,vh/2,Math.min(vw,vh)*0.55,vw/2,vh/2,Math.max(vw,vh)*0.78);
+      rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(1,'rgba(4,2,8,0.42)');
+      g.fillStyle=rg; g.fillRect(0,0,vw,vh);
+      _crtVig=v;
+    }
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.fillStyle=_crtPat; ctx.fillRect(0,0,vw,vh);
+    ctx.drawImage(_crtVig,0,0);
+  }catch(e){}
+}
 /* ---------- frame-rate meter — press F3 to toggle (game and editor) ---------- */
 let _fpsPrev=0,_fpsMs=16.7,SHOW_FPS=false;
 addEventListener('keydown',e=>{ if(e.code==='F3'){ e.preventDefault(); SHOW_FPS=!SHOW_FPS; _fpsMs=16.7; } });

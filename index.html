@@ -258,6 +258,7 @@ button.primary:active{transform:translate(5px,5px);box-shadow:0 0 0 #3a3145}
   <div class="card">
     <h2 data-i18n="set_title">Settings</h2>
     <div class="setRow"><span data-i18n="set_reduce">Reduce motion (screen shake, hit-stop)</span><button id="setReduce">Off</button></div>
+    <div class="setRow"><span data-i18n="set_crt">CRT scanlines</span><button id="setCrt">Off</button></div>
     <div class="setRow"><span data-i18n="set_contrast">High-contrast suspicion cues</span><button id="setContrast">Off</button></div>
     <div class="setRow"><span data-i18n="set_language">Language</span><button id="setLangBtn">English</button></div>
     <h3 style="margin:14px 0 6px;font-size:14px;color:var(--gold)" data-i18n="set_keyboard">Keyboard</h3>
@@ -1371,6 +1372,31 @@ function feelDecay(dt){
   if(FLASH>0){ FLASH*=Math.pow(0.02,dt); if(FLASH<0.012)FLASH=0; }
 }
 function shakeOffset(){ return SHAKE>0 ? {x:(Math.random()*2-1)*SHAKE,y:(Math.random()*2-1)*SHAKE} : {x:0,y:0}; }
+/* ---------- CRT overlay — scanlines + corner vignette, toggled by the client ---------- */
+let CRT_ON=false,_crtPat=null,_crtVig=null,_crtW=0,_crtH=0;
+function applyCrt(){
+  if(!CRT_ON)return;
+  try{
+    if(!_crtPat){
+      const c=document.createElement('canvas'); c.width=4; c.height=3;
+      const g=c.getContext('2d');
+      g.fillStyle='rgba(0,0,0,0.16)'; g.fillRect(0,2,4,1);   // one dark line per 3px
+      _crtPat=ctx.createPattern(c,'repeat');
+    }
+    if(!_crtVig||_crtW!==vw||_crtH!==vh){
+      _crtW=vw;_crtH=vh;
+      const v=document.createElement('canvas'); v.width=vw; v.height=vh;
+      const g=v.getContext('2d');
+      const rg=g.createRadialGradient(vw/2,vh/2,Math.min(vw,vh)*0.55,vw/2,vh/2,Math.max(vw,vh)*0.78);
+      rg.addColorStop(0,'rgba(0,0,0,0)'); rg.addColorStop(1,'rgba(4,2,8,0.42)');
+      g.fillStyle=rg; g.fillRect(0,0,vw,vh);
+      _crtVig=v;
+    }
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.fillStyle=_crtPat; ctx.fillRect(0,0,vw,vh);
+    ctx.drawImage(_crtVig,0,0);
+  }catch(e){}
+}
 /* ---------- frame-rate meter — press F3 to toggle (game and editor) ---------- */
 let _fpsPrev=0,_fpsMs=16.7,SHOW_FPS=false;
 addEventListener('keydown',e=>{ if(e.code==='F3'){ e.preventDefault(); SHOW_FPS=!SHOW_FPS; _fpsMs=16.7; } });
@@ -1742,7 +1768,7 @@ const L10N={
     ctl_grab:'Grab treasure', ctl_decoy:'Fake treasure (lure heroes)', ctl_snap:'Chest Snap (scare heroes)',
     ctl_map:'Toggle minimap', ctl_pause:'Pause / resume',
     btn_begin:'Begin', btn_settings:'\u2699 Settings', btn_fullscreen:'\u26f6 Fullscreen', btn_resume:'Resume',
-    paused:'Paused', set_title:'Settings', set_reduce:'Reduce motion (screen shake, hit-stop)',
+    paused:'Paused', set_title:'Settings', set_reduce:'Reduce motion (screen shake, hit-stop)', set_crt:'CRT scanlines',
     set_contrast:'High-contrast suspicion cues', set_gb:'Game Boy mode (4-color retro)', set_gb_scheme:'Game Boy palette', set_gb_px:'Game Boy pixel size', set_keyboard:'Keyboard', set_language:'Language',
     btn_reset_keys:'Reset keys', btn_done:'Done',
     ab_decoy:'Fake Loot', ab_snap:'Chest Snap', goal_label:'Treasure Recovered', goal_ghost:'Escape Unseen',
@@ -1764,7 +1790,7 @@ const L10N={
     ctl_grab:'Agarrar tesoro', ctl_decoy:'Tesoro falso (atrae h\u00e9roes)', ctl_snap:'Mordisco (asusta h\u00e9roes)',
     ctl_map:'Mostrar minimapa', ctl_pause:'Pausar / reanudar',
     btn_begin:'Comenzar', btn_settings:'\u2699 Ajustes', btn_fullscreen:'\u26f6 Pantalla completa', btn_resume:'Reanudar',
-    paused:'En pausa', set_title:'Ajustes', set_reduce:'Reducir movimiento (sacudidas, pausas de impacto)',
+    paused:'En pausa', set_title:'Ajustes', set_reduce:'Reducir movimiento (sacudidas, pausas de impacto)', set_crt:'L\u00edneas CRT',
     set_contrast:'Indicadores de sospecha de alto contraste', set_gb:'Modo Game Boy (4 colores)', set_gb_scheme:'Paleta Game Boy', set_gb_px:'Tama\u00f1o de p\u00edxel Game Boy', set_keyboard:'Teclado', set_language:'Idioma',
     btn_reset_keys:'Restablecer teclas', btn_done:'Listo',
     ab_decoy:'Cebo', ab_snap:'Mordisco', goal_label:'Tesoro Recuperado', goal_ghost:'Escapa Sin Ser Visto',
@@ -2394,6 +2420,7 @@ let _settingsReturn='titleScreen', _listenAction=null;
 function keyLabel(code){ return String(code||'').replace(/^Key/,'').replace(/^Digit/,'').replace('Arrow','\u2190 ').replace('ShiftLeft','L-Shift').replace('ShiftRight','R-Shift').replace('Space','Space').replace('Escape','Esc')||'?'; }
 function refreshSettings(){
   document.getElementById('setReduce').textContent=SAVE.settings.reduceMotion?'On':'Off';
+  document.getElementById('setCrt').textContent=SAVE.settings.crt?'On':'Off';
   { const lb=document.getElementById('setLangBtn'); if(lb)lb.textContent=t('lang_name'); }
   document.getElementById('setContrast').textContent=SAVE.settings.highContrast?'On':'Off';
   const list=document.getElementById('bindList'); list.innerHTML='';
@@ -2411,6 +2438,7 @@ function closeSettings(){ _listenAction=null; show('settingsScreen',false); }
 document.getElementById('btnSettingsTitle').onclick=()=>openSettings('titleScreen');
 document.getElementById('btnSettingsPause').onclick=()=>{ show('pauseScreen',false); openSettings('pauseScreen'); };
 document.getElementById('setReduce').onclick=()=>{ SAVE.settings.reduceMotion=!SAVE.settings.reduceMotion; persistSave(); refreshSettings(); };
+document.getElementById('setCrt').onclick=()=>{ SAVE.settings.crt=!SAVE.settings.crt; CRT_ON=!!SAVE.settings.crt; persistSave(); refreshSettings(); };
 document.getElementById('setContrast').onclick=()=>{ SAVE.settings.highContrast=!SAVE.settings.highContrast; persistSave(); refreshSettings(); };
 document.getElementById('setReset').onclick=()=>{ SAVE.settings.binds={...DEFAULT_BINDS}; _listenAction=null; persistSave(); refreshSettings(); };
 document.getElementById('setLangBtn').onclick=()=>{ const i=LANGS.indexOf(SAVE.settings.lang||'en'); setLang(LANGS[(i+1)%LANGS.length]); refreshSettings(); };
@@ -3389,6 +3417,7 @@ function frame(now){
     ctx.setTransform(1,0,0,1,0,0);
     ctx.fillStyle='#120c1d';ctx.fillRect(0,0,vw,vh);
   }
+  applyCrt();
   fpsFrame(now);
   requestAnimationFrame(frame);
 }
@@ -3447,6 +3476,7 @@ async function bootLevels(){
 }
 bootLevels();
 applyL10n();
+CRT_ON=!!(SAVE.settings&&SAVE.settings.crt);
 refreshLevelList();
 requestAnimationFrame(frame);
 
