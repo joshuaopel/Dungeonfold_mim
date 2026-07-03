@@ -2399,7 +2399,7 @@ function setTool(t){
     erase:'Drag over tiles or click entities to remove them.',
     pan:'Drag to scroll the map. (Or middle-mouse drag anytime, wheel to zoom.)',
     spawn:'Click to set where the Mimic starts.',
-    portal:'Click to place the escape portal.',
+    portal:'Click to place the escape portal. Select it to give the exit custom art (the glow and EXIT label stay).',
     torch:'Click to place a torch (warm cosmetic light). Select it to set range, colour, brightness, flicker, or custom art.',
     beacon:'Click to place a glowing beacon — a pulsing coloured light with no torch sprite. Great for guiding the eye or marking objectives. Select it to tune colour, range, brightness, and pulse.',
     gold:'Click to place gold (worth 1).', gem:'Click to place a gem (worth 3).', artifact:'Click to place an artifact (worth 5, speed boost).',
@@ -2459,7 +2459,15 @@ function loadAssetImage(aid){
   im.src=level.assets[aid];
 }
 function setSelArt(dataUrl){
-  const s=selRef(); if(!s||!dataUrl||!dataUrl.startsWith('data:image'))return;
+  if(!dataUrl||!dataUrl.startsWith('data:image'))return;
+  if(ed.sel&&ed.sel.type==='portal'){ // exit art lives in the level-wide art slot (there is one exit per level)
+    pushUndo();
+    level.art=level.art||{}; level.art.portal=dataUrl;
+    loadArtImages(level);
+    ed._lastSel=null; refreshSelPanel();
+    return;
+  }
+  const s=selRef(); if(!s)return;
   pushUndo();
   let aid=null;
   for(const k of Object.keys(level.assets)) if(level.assets[k]===dataUrl){aid=k;break;}
@@ -2469,6 +2477,13 @@ function setSelArt(dataUrl){
   refreshSelPanel();
 }
 function clearSelArt(){
+  if(ed.sel&&ed.sel.type==='portal'){
+    if(!(level.art&&level.art.portal))return;
+    pushUndo();
+    delete level.art.portal; delete artImgs.portal;
+    ed._lastSel=null; refreshSelPanel();
+    return;
+  }
   const s=selRef(); if(!s||!s.aid)return;
   pushUndo();
   delete s.aid;
@@ -2494,6 +2509,15 @@ function renderSelProps(s,pool){
     cb.onchange=()=>{ pushUndo(); set(cb.checked); };
     l.append(cb,document.createTextNode(label)); r.appendChild(l); row.appendChild(r);
   };
+  if(pool==='portal'){
+    any=true;
+    const info=document.createElement('div'); info.className='propRow';
+    info.textContent='Custom art replaces the drawn stairwell — the glow and EXIT label stay. Uses the same image as the Art & Audio "Portal" slot. Horizontal strips animate.';
+    info.style.cssText='color:#aaa;font-size:11px;line-height:1.5';
+    row.appendChild(info);
+    row.style.display='';
+    return;
+  }
   if(pool==='keys'){
     any=true;
     const k=ed.sel&&ed.sel.ref;
@@ -2595,6 +2619,18 @@ function refreshSelPanel(){
     document.getElementById('selArtClr').style.display='none';
     document.getElementById('selHintRow').style.display='none';
     renderSelProps(null,'triggers');
+    return;
+  }
+  if(ed.sel&&ed.sel.type==='portal'){
+    if(ed.sel.ref===ed._lastSel){p.classList.remove('hidden');return;}
+    ed._lastSel=ed.sel.ref;
+    p.classList.remove('hidden');
+    ['libPanel','enemyPanel','artPanel','storyPanel'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+    document.getElementById('selLabel').textContent='Exit portal'+((level.art&&level.art.portal)?' · custom art':'');
+    document.getElementById('selArtRow').style.display='';
+    document.getElementById('selArtClr').style.display=(level.art&&level.art.portal)?'':'none';
+    document.getElementById('selHintRow').style.display='none';
+    renderSelProps(null,'portal');
     return;
   }
   const s=(MODE==='editor')?selRef():null;
@@ -2769,7 +2805,7 @@ function refreshLibPanel(){
     wrap.appendChild(card);
   }
 }
-document.getElementById('selArtBtn').onclick=()=>{ if(selRef())document.getElementById('selArtFile').click(); };
+document.getElementById('selArtBtn').onclick=()=>{ if(selRef()||(ed.sel&&ed.sel.type==='portal'))document.getElementById('selArtFile').click(); };
 document.getElementById('selArtFile').onchange=()=>{
   const fi=document.getElementById('selArtFile');
   const file=fi.files&&fi.files[0]; if(!file)return;
